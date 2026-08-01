@@ -159,14 +159,3 @@ npm test
 ## 风险声明
 
 EventLens 仅供研究与产品演示。市场数据可能延迟或来自缓存/Fixture。所有分析与风险说明不构成投资建议，不保证收益，请勿用于实盘决策。
-
-## 已完成清单
-
-- [x] Provider 抽象（yfinance / Alpaca / Fixture / DeepSeek / Rules）
-- [x] 统一内部 Schema 与公开 API
-- [x] 市场首页 + 股票工作台（桌面三栏 / 移动 Bottom Sheet）
-- [x] Lightweight Charts + MA/MACD/RSI + 新闻 Marker
-- [x] 事件反应计算 + 新闻分析
-- [x] 模拟交易、订单预览、风险规则、账户持久化
-- [x] WebSocket `/ws/market` + 轮询降级
-- [x] 150+ 标的池、Fixture、README、Docker Compose、基础测试
