@@ -1,0 +1,72 @@
+{
+  "AAPL": {
+    "symbol": "AAPL",
+    "price": 210.9,
+    "previousClose": 207.1,
+    "change": 3.8,
+    "changePercent": 1.83,
+    "dayHigh": 211.2,
+    "dayLow": 206.8,
+    "volume": 15342000,
+    "marketState": "regular",
+    "timestamp": "2026-07-30T14:35:03Z",
+    "delayed": false,
+    "provider": "fixture"
+  },
+  "NVDA": {
+    "symbol": "NVDA",
+    "price": 178.42,
+    "previousClose": 171.85,
+    "change": 6.57,
+    "changePercent": 3.82,
+    "dayHigh": 179.1,
+    "dayLow": 170.6,
+    "volume": 42187600,
+    "marketState": "regular",
+    "timestamp": "2026-07-30T14:35:03Z",
+    "delayed": false,
+    "provider": "fixture"
+  },
+  "TSLA": {
+    "symbol": "TSLA",
+    "price": 318.75,
+    "previousClose": 312.4,
+    "change": 6.35,
+    "changePercent": 2.03,
+    "dayHigh": 321.5,
+    "dayLow": 309.8,
+    "volume": 9876500,
+    "marketState": "regular",
+    "timestamp": "2026-07-30T14:35:03Z",
+    "delayed": false,
+    "provider": "fixture"
+  },
+  "MSFT": {
+    "symbol": "MSFT",
+    "price": 524.18,
+    "previousClose": 519.6,
+    "change": 4.58,
+    "changePercent": 0.88,
+    "dayHigh": 526.3,
+    "dayLow": 517.9,
+    "volume": 6543200,
+    "marketState": "regular",
+    "timestamp": "2026-07-30T14:35:03Z",
+    "delayed": false,
+    "provider": "fixture"
+  },
+  "META": {
+    "symbol": "META",
+    "price": 782.35,
+    "previousClose": 775.9,
+    "change": 6.45,
+    "changePercent": 0.83,
+    "dayHigh": 785.0,
+    "dayLow": 773.2,
+    "volume": 4321800,
+    "marketState": "regular",
+    "timestamp": "2026-07-30T14:35:03Z",
+    "delayed": false,
+    "provider": "fixture"
+  }
+}

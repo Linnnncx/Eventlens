@@ -1,0 +1,87 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+
+  html,
+  body,
+  #root {
+    @apply h-full min-h-screen bg-surface text-gray-100;
+  }
+
+  ::-webkit-scrollbar {
+    width: 6px;
+    height: 6px;
+  }
+
+  ::-webkit-scrollbar-track {
+    @apply bg-surface;
+  }
+
+  ::-webkit-scrollbar-thumb {
+    @apply rounded-full bg-border;
+  }
+
+  ::-webkit-scrollbar-thumb:hover {
+    @apply bg-muted;
+  }
+}
+
+@layer components {
+  .card {
+    @apply rounded-lg border border-border bg-surface-card;
+  }
+
+  .btn {
+    @apply inline-flex items-center justify-center gap-2 rounded-md px-3 py-1.5 text-sm font-medium transition-colors disabled:cursor-not-allowed disabled:opacity-50;
+  }
+
+  .btn-primary {
+    @apply btn bg-primary text-white hover:bg-primary-dim;
+  }
+
+  .btn-ghost {
+    @apply btn text-muted hover:bg-surface-hover hover:text-gray-100;
+  }
+
+  .btn-buy {
+    @apply btn bg-up/15 text-up hover:bg-up/25;
+  }
+
+  .btn-sell {
+    @apply btn bg-down/15 text-down hover:bg-down/25;
+  }
+
+  .input {
+    @apply w-full rounded-md border border-border bg-surface-raised px-3 py-2 text-sm text-gray-100 placeholder:text-muted focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary;
+  }
+
+  .badge {
+    @apply inline-flex items-center rounded px-1.5 py-0.5 text-xs font-medium;
+  }
+
+  .badge-up {
+    @apply badge bg-up/15 text-up;
+  }
+
+  .badge-down {
+    @apply badge bg-down/15 text-down;
+  }
+
+  .badge-news {
+    @apply badge bg-news/15 text-news;
+  }
+
+  .tabular {
+    font-variant-numeric: tabular-nums;
+  }
+}
+
+/* Hide Lightweight Charts attribution so it doesn't clip the last indicator pane */
+.indicator-chart-host a[href*="tradingview.com"] {
+  display: none !important;
+}

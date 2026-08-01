@@ -1,0 +1,1380 @@
+{
+  "NVDA": [
+    {
+      "id": "nvda_news_1",
+      "headline": "NVIDIA unveils Blackwell Ultra GPU; cloud partners commit day-one capacity",
+      "summaryOriginal": "NVIDIA unveils Blackwell Ultra GPU; cloud partners commit day-one capacity. Fixture demo article for EventLens chart bubbles.",
+      "summaryAi": null,
+      "source": "Fixture Wire",
+      "url": "https://example.com/nvda_news_1",
+      "publishedAt": "2026-07-29T14:00:00Z",
+      "symbols": [
+        "NVDA"
+      ],
+      "eventType": "product",
+      "importance": "high",
+      "direction": "positive",
+      "timeHorizon": "short_term",
+      "provider": "fixture",
+      "imageUrl": "https://picsum.photos/seed/nvda_news_1/640/360"
+    },
+    {
+      "id": "nvda_news_2",
+      "headline": "NVIDIA Q2 crush: data-center revenue jumps on AI training demand",
+      "summaryOriginal": "NVIDIA Q2 crush: data-center revenue jumps on AI training demand. Fixture demo article for EventLens chart bubbles.",
+      "summaryAi": null,
+      "source": "Fixture Wire",
+      "url": "https://example.com/nvda_news_2",
+      "publishedAt": "2026-07-29T16:48:57Z",
+      "symbols": [
+        "NVDA"
+      ],
+      "eventType": "earnings",
+      "importance": "high",
+      "direction": "positive",
+      "timeHorizon": "short_term",
+      "provider": "fixture",
+      "imageUrl": "https://picsum.photos/seed/nvda_news_2/640/360"
+    },
+    {
+      "id": "nvda_news_3",
+      "headline": "Morgan Stanley lifts NVDA target citing multi-year AI capex cycle",
+      "summaryOriginal": "Morgan Stanley lifts NVDA target citing multi-year AI capex cycle. Fixture demo article for EventLens chart bubbles.",
+      "summaryAi": null,
+      "source": "Fixture Wire",
+      "url": "https://example.com/nvda_news_3",
+      "publishedAt": "2026-07-29T19:05:55Z",
+      "symbols": [
+        "NVDA"
+      ],
+      "eventType": "analyst",
+      "importance": "medium",
+      "direction": "positive",
+      "timeHorizon": "short_term",
+      "provider": "fixture",
+      "imageUrl": "https://picsum.photos/seed/nvda_news_3/640/360"
+    },
+    {
+      "id": "nvda_news_4",
+      "headline": "US export review expands scrutiny on advanced AI chip shipments",
+      "summaryOriginal": "US export review expands scrutiny on advanced AI chip shipments. Fixture demo article for EventLens chart bubbles.",
+      "summaryAi": null,
+      "source": "Fixture Wire",
+      "url": "https://example.com/nvda_news_4",
+      "publishedAt": "2026-07-29T21:13:02Z",
+      "symbols": [
+        "NVDA"
+      ],
+      "eventType": "regulation",
+      "importance": "medium",
+      "direction": "negative",
+      "timeHorizon": "short_term",
+      "provider": "fixture",
+      "imageUrl": "https://picsum.photos/seed/nvda_news_4/640/360"
+    },
+    {
+      "id": "nvda_news_5",
+      "headline": "CUDA 13 preview adds new inference kernels for enterprise LLMs",
+      "summaryOriginal": "CUDA 13 preview adds new inference kernels for enterprise LLMs. Fixture demo article for EventLens chart bubbles.",
+      "summaryAi": null,
+      "source": "Fixture Wire",
+      "url": "https://example.com/nvda_news_5",
+      "publishedAt": "2026-07-29T23:14:11Z",
+      "symbols": [
+        "NVDA"
+      ],
+      "eventType": "product",
+      "importance": "medium",
+      "direction": "positive",
+      "timeHorizon": "short_term",
+      "provider": "fixture",
+      "imageUrl": "https://picsum.photos/seed/nvda_news_5/640/360"
+    },
+    {
+      "id": "nvda_news_6",
+      "headline": "NVIDIA raises full-year guidance after hyperscaler pull-forward orders",
+      "summaryOriginal": "NVIDIA raises full-year guidance after hyperscaler pull-forward orders. Fixture demo article for EventLens chart bubbles.",
+      "summaryAi": null,
+      "source": "Fixture Wire",
+      "url": "https://example.com/nvda_news_6",
+      "publishedAt": "2026-07-30T01:11:05Z",
+      "symbols": [
+        "NVDA"
+      ],
+      "eventType": "guidance",
+      "importance": "high",
+      "direction": "positive",
+      "timeHorizon": "short_term",
+      "provider": "fixture",
+      "imageUrl": "https://picsum.photos/seed/nvda_news_6/640/360"
+    },
+    {
+      "id": "nvda_news_7",
+      "headline": "NVIDIA appoints new VP of enterprise software partnerships",
+      "summaryOriginal": "NVIDIA appoints new VP of enterprise software partnerships. Fixture demo article for EventLens chart bubbles.",
+      "summaryAi": null,
+      "source": "Fixture Wire",
+      "url": "https://example.com/nvda_news_7",
+      "publishedAt": "2026-07-30T03:04:42Z",
+      "symbols": [
+        "NVDA"
+      ],
+      "eventType": "management",
+      "importance": "low",
+      "direction": "neutral",
+      "timeHorizon": "short_term",
+      "provider": "fixture",
+      "imageUrl": "https://picsum.photos/seed/nvda_news_7/640/360"
+    },
+    {
+      "id": "nvda_news_8",
+      "headline": "Chip stocks swing as Treasury yields jump into the close",
+      "summaryOriginal": "Chip stocks swing as Treasury yields jump into the close. Fixture demo article for EventLens chart bubbles.",
+      "summaryAi": null,
+      "source": "Fixture Wire",
+      "url": "https://example.com/nvda_news_8",
+      "publishedAt": "2026-07-30T04:55:41Z",
+      "symbols": [
+        "NVDA"
+      ],
+      "eventType": "macro",
+      "importance": "medium",
+      "direction": "uncertain",
+      "timeHorizon": "short_term",
+      "provider": "fixture",
+      "imageUrl": "https://picsum.photos/seed/nvda_news_8/640/360"
+    },
+    {
+      "id": "nvda_news_9",
+      "headline": "Bank of America reiterates Buy on NVDA after channel checks",
+      "summaryOriginal": "Bank of America reiterates Buy on NVDA after channel checks. Fixture demo article for EventLens chart bubbles.",
+      "summaryAi": null,
+      "source": "Fixture Wire",
+      "url": "https://example.com/nvda_news_9",
+      "publishedAt": "2026-07-30T05:54:27Z",
+      "symbols": [
+        "NVDA"
+      ],
+      "eventType": "analyst",
+      "importance": "medium",
+      "direction": "positive",
+      "timeHorizon": "short_term",
+      "provider": "fixture",
+      "imageUrl": "https://picsum.photos/seed/nvda_news_9/640/360"
+    },
+    {
+      "id": "nvda_news_10",
+      "headline": "NVIDIA partners with major OEM on liquid-cooled rack reference design",
+      "summaryOriginal": "NVIDIA partners with major OEM on liquid-cooled rack reference design. Fixture demo article for EventLens chart bubbles.",
+      "summaryAi": null,
+      "source": "Fixture Wire",
+      "url": "https://example.com/nvda_news_10",
+      "publishedAt": "2026-07-30T07:41:19Z",
+      "symbols": [
+        "NVDA"
+      ],
+      "eventType": "product",
+      "importance": "medium",
+      "direction": "positive",
+      "timeHorizon": "short_term",
+      "provider": "fixture",
+      "imageUrl": "https://picsum.photos/seed/nvda_news_10/640/360"
+    },
+    {
+      "id": "nvda_news_11",
+      "headline": "Patent suit filed against NVIDIA over GPU scheduling claims",
+      "summaryOriginal": "Patent suit filed against NVIDIA over GPU scheduling claims. Fixture demo article for EventLens chart bubbles.",
+      "summaryAi": null,
+      "source": "Fixture Wire",
+      "url": "https://example.com/nvda_news_11",
+      "publishedAt": "2026-07-30T09:26:32Z",
+      "symbols": [
+        "NVDA"
+      ],
+      "eventType": "legal",
+      "importance": "low",
+      "direction": "negative",
+      "timeHorizon": "short_term",
+      "provider": "fixture",
+      "imageUrl": null
+    },
+    {
+      "id": "nvda_news_12",
+      "headline": "NVIDIA announces $500M AI research grants for universities",
+      "summaryOriginal": "NVIDIA announces $500M AI research grants for universities. Fixture demo article for EventLens chart bubbles.",
+      "summaryAi": null,
+      "source": "Fixture Wire",
+      "url": "https://example.com/nvda_news_12",
+      "publishedAt": "2026-07-30T11:10:17Z",
+      "symbols": [
+        "NVDA"
+      ],
+      "eventType": "company_update",
+      "importance": "medium",
+      "direction": "positive",
+      "timeHorizon": "short_term",
+      "provider": "fixture",
+      "imageUrl": "https://picsum.photos/seed/nvda_news_12/640/360"
+    },
+    {
+      "id": "nvda_news_13",
+      "headline": "Preliminary margin commentary points to another sequential beat",
+      "summaryOriginal": "Preliminary margin commentary points to another sequential beat. Fixture demo article for EventLens chart bubbles.",
+      "summaryAi": null,
+      "source": "Fixture Wire",
+      "url": "https://example.com/nvda_news_13",
+      "publishedAt": "2026-07-30T12:52:44Z",
+      "symbols": [
+        "NVDA"
+      ],
+      "eventType": "earnings",
+      "importance": "medium",
+      "direction": "positive",
+      "timeHorizon": "short_term",
+      "provider": "fixture",
+      "imageUrl": "https://picsum.photos/seed/nvda_news_13/640/360"
+    },
+    {
+      "id": "nvda_news_14",
+      "headline": "China customers delay orders amid license uncertainty",
+      "summaryOriginal": "China customers delay orders amid license uncertainty. Fixture demo article for EventLens chart bubbles.",
+      "summaryAi": null,
+      "source": "Fixture Wire",
+      "url": "https://example.com/nvda_news_14",
+      "publishedAt": "2026-07-30T14:33:59Z",
+      "symbols": [
+        "NVDA"
+      ],
+      "eventType": "regulation",
+      "importance": "high",
+      "direction": "negative",
+      "timeHorizon": "short_term",
+      "provider": "fixture",
+      "imageUrl": "https://picsum.photos/seed/nvda_news_14/640/360"
+    },
+    {
+      "id": "nvda_news_15",
+      "headline": "GeForce Studio drivers optimize new creator apps",
+      "summaryOriginal": "GeForce Studio drivers optimize new creator apps. Fixture demo article for EventLens chart bubbles.",
+      "summaryAi": null,
+      "source": "Fixture Wire",
+      "url": "https://example.com/nvda_news_15",
+      "publishedAt": "2026-07-30T16:14:09Z",
+      "symbols": [
+        "NVDA"
+      ],
+      "eventType": "product",
+      "importance": "low",
+      "direction": "positive",
+      "timeHorizon": "short_term",
+      "provider": "fixture",
+      "imageUrl": null
+    },
+    {
+      "id": "nvda_news_16",
+      "headline": "Semiconductor ETF inflows accelerate ahead of FOMC",
+      "summaryOriginal": "Semiconductor ETF inflows accelerate ahead of FOMC. Fixture demo article for EventLens chart bubbles.",
+      "summaryAi": null,
+      "source": "Fixture Wire",
+      "url": "https://example.com/nvda_news_16",
+      "publishedAt": "2026-07-30T17:03:20Z",
+      "symbols": [
+        "NVDA"
+      ],
+      "eventType": "macro",
+      "importance": "medium",
+      "direction": "uncertain",
+      "timeHorizon": "short_term",
+      "provider": "fixture",
+      "imageUrl": "https://picsum.photos/seed/nvda_news_16/640/360"
+    },
+    {
+      "id": "nvda_news_17",
+      "headline": "Citi adds NVDA to focus list on inference upside",
+      "summaryOriginal": "Citi adds NVDA to focus list on inference upside. Fixture demo article for EventLens chart bubbles.",
+      "summaryAi": null,
+      "source": "Fixture Wire",
+      "url": "https://example.com/nvda_news_17",
+      "publishedAt": "2026-07-30T18:41:35Z",
+      "symbols": [
+        "NVDA"
+      ],
+      "eventType": "analyst",
+      "importance": "low",
+      "direction": "positive",
+      "timeHorizon": "short_term",
+      "provider": "fixture",
+      "imageUrl": null
+    },
+    {
+      "id": "nvda_news_18",
+      "headline": "NVIDIA schedules AI developer conference keynote replay",
+      "summaryOriginal": "NVIDIA schedules AI developer conference keynote replay. Fixture demo article for EventLens chart bubbles.",
+      "summaryAi": null,
+      "source": "Fixture Wire",
+      "url": "https://example.com/nvda_news_18",
+      "publishedAt": "2026-07-30T20:19:00Z",
+      "symbols": [
+        "NVDA"
+      ],
+      "eventType": "company_update",
+      "importance": "medium",
+      "direction": "neutral",
+      "timeHorizon": "short_term",
+      "provider": "fixture",
+      "imageUrl": "https://picsum.photos/seed/nvda_news_18/640/360"
+    }
+  ],
+  "AAPL": [
+    {
+      "id": "aapl_news_1",
+      "headline": "Apple beats estimates as Services hits a new record",
+      "summaryOriginal": "Apple beats estimates as Services hits a new record. Fixture demo article for EventLens chart bubbles.",
+      "summaryAi": null,
+      "source": "Fixture Wire",
+      "url": "https://example.com/aapl_news_1",
+      "publishedAt": "2026-07-29T14:00:00Z",
+      "symbols": [
+        "AAPL"
+      ],
+      "eventType": "earnings",
+      "importance": "high",
+      "direction": "positive",
+      "timeHorizon": "short_term",
+      "provider": "fixture",
+      "imageUrl": "https://picsum.photos/seed/aapl_news_1/640/360"
+    },
+    {
+      "id": "aapl_news_2",
+      "headline": "Goldman raises AAPL target on AI device upgrade cycle",
+      "summaryOriginal": "Goldman raises AAPL target on AI device upgrade cycle. Fixture demo article for EventLens chart bubbles.",
+      "summaryAi": null,
+      "source": "Fixture Wire",
+      "url": "https://example.com/aapl_news_2",
+      "publishedAt": "2026-07-29T17:07:08Z",
+      "symbols": [
+        "AAPL"
+      ],
+      "eventType": "analyst",
+      "importance": "medium",
+      "direction": "positive",
+      "timeHorizon": "short_term",
+      "provider": "fixture",
+      "imageUrl": "https://picsum.photos/seed/aapl_news_2/640/360"
+    },
+    {
+      "id": "aapl_news_3",
+      "headline": "EU opens App Store fee structure review",
+      "summaryOriginal": "EU opens App Store fee structure review. Fixture demo article for EventLens chart bubbles.",
+      "summaryAi": null,
+      "source": "Fixture Wire",
+      "url": "https://example.com/aapl_news_3",
+      "publishedAt": "2026-07-29T19:38:41Z",
+      "symbols": [
+        "AAPL"
+      ],
+      "eventType": "regulation",
+      "importance": "medium",
+      "direction": "negative",
+      "timeHorizon": "short_term",
+      "provider": "fixture",
+      "imageUrl": "https://picsum.photos/seed/aapl_news_3/640/360"
+    },
+    {
+      "id": "aapl_news_4",
+      "headline": "Vision Pro 2 rumored with lighter frame for fall event",
+      "summaryOriginal": "Vision Pro 2 rumored with lighter frame for fall event. Fixture demo article for EventLens chart bubbles.",
+      "summaryAi": null,
+      "source": "Fixture Wire",
+      "url": "https://example.com/aapl_news_4",
+      "publishedAt": "2026-07-29T21:59:17Z",
+      "symbols": [
+        "AAPL"
+      ],
+      "eventType": "product",
+      "importance": "medium",
+      "direction": "positive",
+      "timeHorizon": "short_term",
+      "provider": "fixture",
+      "imageUrl": "https://picsum.photos/seed/aapl_news_4/640/360"
+    },
+    {
+      "id": "aapl_news_5",
+      "headline": "Foxconn confirms steady iPhone production ramp",
+      "summaryOriginal": "Foxconn confirms steady iPhone production ramp. Fixture demo article for EventLens chart bubbles.",
+      "summaryAi": null,
+      "source": "Fixture Wire",
+      "url": "https://example.com/aapl_news_5",
+      "publishedAt": "2026-07-30T00:13:15Z",
+      "symbols": [
+        "AAPL"
+      ],
+      "eventType": "product",
+      "importance": "low",
+      "direction": "neutral",
+      "timeHorizon": "short_term",
+      "provider": "fixture",
+      "imageUrl": null
+    },
+    {
+      "id": "aapl_news_6",
+      "headline": "Morgan Stanley trims China smartphone assumptions",
+      "summaryOriginal": "Morgan Stanley trims China smartphone assumptions. Fixture demo article for EventLens chart bubbles.",
+      "summaryAi": null,
+      "source": "Fixture Wire",
+      "url": "https://example.com/aapl_news_6",
+      "publishedAt": "2026-07-30T02:22:29Z",
+      "symbols": [
+        "AAPL"
+      ],
+      "eventType": "analyst",
+      "importance": "medium",
+      "direction": "negative",
+      "timeHorizon": "short_term",
+      "provider": "fixture",
+      "imageUrl": "https://picsum.photos/seed/aapl_news_6/640/360"
+    },
+    {
+      "id": "aapl_news_7",
+      "headline": "Apple signals stronger Services growth into holiday quarter",
+      "summaryOriginal": "Apple signals stronger Services growth into holiday quarter. Fixture demo article for EventLens chart bubbles.",
+      "summaryAi": null,
+      "source": "Fixture Wire",
+      "url": "https://example.com/aapl_news_7",
+      "publishedAt": "2026-07-30T04:28:04Z",
+      "symbols": [
+        "AAPL"
+      ],
+      "eventType": "guidance",
+      "importance": "high",
+      "direction": "positive",
+      "timeHorizon": "short_term",
+      "provider": "fixture",
+      "imageUrl": "https://picsum.photos/seed/aapl_news_7/640/360"
+    },
+    {
+      "id": "aapl_news_8",
+      "headline": "Consumer discretionary names mixed after retail data",
+      "summaryOriginal": "Consumer discretionary names mixed after retail data. Fixture demo article for EventLens chart bubbles.",
+      "summaryAi": null,
+      "source": "Fixture Wire",
+      "url": "https://example.com/aapl_news_8",
+      "publishedAt": "2026-07-30T06:30:44Z",
+      "symbols": [
+        "AAPL"
+      ],
+      "eventType": "macro",
+      "importance": "medium",
+      "direction": "uncertain",
+      "timeHorizon": "short_term",
+      "provider": "fixture",
+      "imageUrl": "https://picsum.photos/seed/aapl_news_8/640/360"
+    },
+    {
+      "id": "aapl_news_9",
+      "headline": "Apple retail leadership role expands in Asia-Pacific",
+      "summaryOriginal": "Apple retail leadership role expands in Asia-Pacific. Fixture demo article for EventLens chart bubbles.",
+      "summaryAi": null,
+      "source": "Fixture Wire",
+      "url": "https://example.com/aapl_news_9",
+      "publishedAt": "2026-07-30T07:40:55Z",
+      "symbols": [
+        "AAPL"
+      ],
+      "eventType": "management",
+      "importance": "low",
+      "direction": "neutral",
+      "timeHorizon": "short_term",
+      "provider": "fixture",
+      "imageUrl": null
+    },
+    {
+      "id": "aapl_news_10",
+      "headline": "iOS beta adds on-device AI writing tools",
+      "summaryOriginal": "iOS beta adds on-device AI writing tools. Fixture demo article for EventLens chart bubbles.",
+      "summaryAi": null,
+      "source": "Fixture Wire",
+      "url": "https://example.com/aapl_news_10",
+      "publishedAt": "2026-07-30T09:39:00Z",
+      "symbols": [
+        "AAPL"
+      ],
+      "eventType": "product",
+      "importance": "medium",
+      "direction": "positive",
+      "timeHorizon": "short_term",
+      "provider": "fixture",
+      "imageUrl": "https://picsum.photos/seed/aapl_news_10/640/360"
+    },
+    {
+      "id": "aapl_news_11",
+      "headline": "Antitrust plaintiffs seek additional App Store discovery",
+      "summaryOriginal": "Antitrust plaintiffs seek additional App Store discovery. Fixture demo article for EventLens chart bubbles.",
+      "summaryAi": null,
+      "source": "Fixture Wire",
+      "url": "https://example.com/aapl_news_11",
+      "publishedAt": "2026-07-30T11:35:14Z",
+      "symbols": [
+        "AAPL"
+      ],
+      "eventType": "legal",
+      "importance": "medium",
+      "direction": "negative",
+      "timeHorizon": "short_term",
+      "provider": "fixture",
+      "imageUrl": "https://picsum.photos/seed/aapl_news_11/640/360"
+    },
+    {
+      "id": "aapl_news_12",
+      "headline": "Apple increases supplier diversification in India",
+      "summaryOriginal": "Apple increases supplier diversification in India. Fixture demo article for EventLens chart bubbles.",
+      "summaryAi": null,
+      "source": "Fixture Wire",
+      "url": "https://example.com/aapl_news_12",
+      "publishedAt": "2026-07-30T13:29:51Z",
+      "symbols": [
+        "AAPL"
+      ],
+      "eventType": "company_update",
+      "importance": "low",
+      "direction": "positive",
+      "timeHorizon": "short_term",
+      "provider": "fixture",
+      "imageUrl": null
+    },
+    {
+      "id": "aapl_news_13",
+      "headline": "JPMorgan sees upside to wearables attach rates",
+      "summaryOriginal": "JPMorgan sees upside to wearables attach rates. Fixture demo article for EventLens chart bubbles.",
+      "summaryAi": null,
+      "source": "Fixture Wire",
+      "url": "https://example.com/aapl_news_13",
+      "publishedAt": "2026-07-30T15:23:00Z",
+      "symbols": [
+        "AAPL"
+      ],
+      "eventType": "analyst",
+      "importance": "medium",
+      "direction": "positive",
+      "timeHorizon": "short_term",
+      "provider": "fixture",
+      "imageUrl": "https://picsum.photos/seed/aapl_news_13/640/360"
+    },
+    {
+      "id": "aapl_news_14",
+      "headline": "New MacBook lineup leaks point to higher ASP mix",
+      "summaryOriginal": "New MacBook lineup leaks point to higher ASP mix. Fixture demo article for EventLens chart bubbles.",
+      "summaryAi": null,
+      "source": "Fixture Wire",
+      "url": "https://example.com/aapl_news_14",
+      "publishedAt": "2026-07-30T17:14:50Z",
+      "symbols": [
+        "AAPL"
+      ],
+      "eventType": "product",
+      "importance": "high",
+      "direction": "positive",
+      "timeHorizon": "short_term",
+      "provider": "fixture",
+      "imageUrl": "https://picsum.photos/seed/aapl_news_14/640/360"
+    },
+    {
+      "id": "aapl_news_15",
+      "headline": "USD strength weighs on multinational tech names",
+      "summaryOriginal": "USD strength weighs on multinational tech names. Fixture demo article for EventLens chart bubbles.",
+      "summaryAi": null,
+      "source": "Fixture Wire",
+      "url": "https://example.com/aapl_news_15",
+      "publishedAt": "2026-07-30T19:05:28Z",
+      "symbols": [
+        "AAPL"
+      ],
+      "eventType": "macro",
+      "importance": "low",
+      "direction": "uncertain",
+      "timeHorizon": "short_term",
+      "provider": "fixture",
+      "imageUrl": null
+    },
+    {
+      "id": "aapl_news_16",
+      "headline": "Preliminary China sell-through improves week over week",
+      "summaryOriginal": "Preliminary China sell-through improves week over week. Fixture demo article for EventLens chart bubbles.",
+      "summaryAi": null,
+      "source": "Fixture Wire",
+      "url": "https://example.com/aapl_news_16",
+      "publishedAt": "2026-07-30T20:05:00Z",
+      "symbols": [
+        "AAPL"
+      ],
+      "eventType": "earnings",
+      "importance": "medium",
+      "direction": "positive",
+      "timeHorizon": "short_term",
+      "provider": "fixture",
+      "imageUrl": "https://picsum.photos/seed/aapl_news_16/640/360"
+    }
+  ],
+  "TSLA": [
+    {
+      "id": "tsla_news_1",
+      "headline": "Tesla delivery beat lifts shares in after-hours trade",
+      "summaryOriginal": "Tesla delivery beat lifts shares in after-hours trade. Fixture demo article for EventLens chart bubbles.",
+      "summaryAi": null,
+      "source": "Fixture Wire",
+      "url": "https://example.com/tsla_news_1",
+      "publishedAt": "2026-07-29T14:00:00Z",
+      "symbols": [
+        "TSLA"
+      ],
+      "eventType": "earnings",
+      "importance": "high",
+      "direction": "positive",
+      "timeHorizon": "short_term",
+      "provider": "fixture",
+      "imageUrl": "https://picsum.photos/seed/tsla_news_1/640/360"
+    },
+    {
+      "id": "tsla_news_2",
+      "headline": "Cybertruck production cadence improves at Austin plant",
+      "summaryOriginal": "Cybertruck production cadence improves at Austin plant. Fixture demo article for EventLens chart bubbles.",
+      "summaryAi": null,
+      "source": "Fixture Wire",
+      "url": "https://example.com/tsla_news_2",
+      "publishedAt": "2026-07-29T17:30:25Z",
+      "symbols": [
+        "TSLA"
+      ],
+      "eventType": "product",
+      "importance": "medium",
+      "direction": "positive",
+      "timeHorizon": "short_term",
+      "provider": "fixture",
+      "imageUrl": "https://picsum.photos/seed/tsla_news_2/640/360"
+    },
+    {
+      "id": "tsla_news_3",
+      "headline": "NHTSA opens inquiry into Autopilot incident cluster",
+      "summaryOriginal": "NHTSA opens inquiry into Autopilot incident cluster. Fixture demo article for EventLens chart bubbles.",
+      "summaryAi": null,
+      "source": "Fixture Wire",
+      "url": "https://example.com/tsla_news_3",
+      "publishedAt": "2026-07-29T20:20:41Z",
+      "symbols": [
+        "TSLA"
+      ],
+      "eventType": "regulation",
+      "importance": "medium",
+      "direction": "negative",
+      "timeHorizon": "short_term",
+      "provider": "fixture",
+      "imageUrl": "https://picsum.photos/seed/tsla_news_3/640/360"
+    },
+    {
+      "id": "tsla_news_4",
+      "headline": "Street splits on robotaxi timeline assumptions",
+      "summaryOriginal": "Street splits on robotaxi timeline assumptions. Fixture demo article for EventLens chart bubbles.",
+      "summaryAi": null,
+      "source": "Fixture Wire",
+      "url": "https://example.com/tsla_news_4",
+      "publishedAt": "2026-07-29T22:58:34Z",
+      "symbols": [
+        "TSLA"
+      ],
+      "eventType": "analyst",
+      "importance": "medium",
+      "direction": "uncertain",
+      "timeHorizon": "short_term",
+      "provider": "fixture",
+      "imageUrl": "https://picsum.photos/seed/tsla_news_4/640/360"
+    },
+    {
+      "id": "tsla_news_5",
+      "headline": "Tesla reiterates energy storage growth targets",
+      "summaryOriginal": "Tesla reiterates energy storage growth targets. Fixture demo article for EventLens chart bubbles.",
+      "summaryAi": null,
+      "source": "Fixture Wire",
+      "url": "https://example.com/tsla_news_5",
+      "publishedAt": "2026-07-30T01:28:57Z",
+      "symbols": [
+        "TSLA"
+      ],
+      "eventType": "guidance",
+      "importance": "high",
+      "direction": "positive",
+      "timeHorizon": "short_term",
+      "provider": "fixture",
+      "imageUrl": "https://picsum.photos/seed/tsla_news_5/640/360"
+    },
+    {
+      "id": "tsla_news_6",
+      "headline": "EV peers sell off as rate-cut odds slip",
+      "summaryOriginal": "EV peers sell off as rate-cut odds slip. Fixture demo article for EventLens chart bubbles.",
+      "summaryAi": null,
+      "source": "Fixture Wire",
+      "url": "https://example.com/tsla_news_6",
+      "publishedAt": "2026-07-30T03:53:59Z",
+      "symbols": [
+        "TSLA"
+      ],
+      "eventType": "macro",
+      "importance": "medium",
+      "direction": "negative",
+      "timeHorizon": "short_term",
+      "provider": "fixture",
+      "imageUrl": "https://picsum.photos/seed/tsla_news_6/640/360"
+    },
+    {
+      "id": "tsla_news_7",
+      "headline": "New software update improves FSD highway handling",
+      "summaryOriginal": "New software update improves FSD highway handling. Fixture demo article for EventLens chart bubbles.",
+      "summaryAi": null,
+      "source": "Fixture Wire",
+      "url": "https://example.com/tsla_news_7",
+      "publishedAt": "2026-07-30T06:14:55Z",
+      "symbols": [
+        "TSLA"
+      ],
+      "eventType": "product",
+      "importance": "low",
+      "direction": "positive",
+      "timeHorizon": "short_term",
+      "provider": "fixture",
+      "imageUrl": "https://picsum.photos/seed/tsla_news_7/640/360"
+    },
+    {
+      "id": "tsla_news_8",
+      "headline": "Tesla IR hosts virtual battery day Q&A",
+      "summaryOriginal": "Tesla IR hosts virtual battery day Q&A. Fixture demo article for EventLens chart bubbles.",
+      "summaryAi": null,
+      "source": "Fixture Wire",
+      "url": "https://example.com/tsla_news_8",
+      "publishedAt": "2026-07-30T08:32:32Z",
+      "symbols": [
+        "TSLA"
+      ],
+      "eventType": "management",
+      "importance": "medium",
+      "direction": "neutral",
+      "timeHorizon": "short_term",
+      "provider": "fixture",
+      "imageUrl": "https://picsum.photos/seed/tsla_news_8/640/360"
+    },
+    {
+      "id": "tsla_news_9",
+      "headline": "Megapack bookings rise with utility customers",
+      "summaryOriginal": "Megapack bookings rise with utility customers. Fixture demo article for EventLens chart bubbles.",
+      "summaryAi": null,
+      "source": "Fixture Wire",
+      "url": "https://example.com/tsla_news_9",
+      "publishedAt": "2026-07-30T09:57:22Z",
+      "symbols": [
+        "TSLA"
+      ],
+      "eventType": "company_update",
+      "importance": "medium",
+      "direction": "positive",
+      "timeHorizon": "short_term",
+      "provider": "fixture",
+      "imageUrl": "https://picsum.photos/seed/tsla_news_9/640/360"
+    },
+    {
+      "id": "tsla_news_10",
+      "headline": "Investor suit alleges delayed Autopilot disclosures",
+      "summaryOriginal": "Investor suit alleges delayed Autopilot disclosures. Fixture demo article for EventLens chart bubbles.",
+      "summaryAi": null,
+      "source": "Fixture Wire",
+      "url": "https://example.com/tsla_news_10",
+      "publishedAt": "2026-07-30T12:09:49Z",
+      "symbols": [
+        "TSLA"
+      ],
+      "eventType": "legal",
+      "importance": "low",
+      "direction": "negative",
+      "timeHorizon": "short_term",
+      "provider": "fixture",
+      "imageUrl": "https://picsum.photos/seed/tsla_news_10/640/360"
+    },
+    {
+      "id": "tsla_news_11",
+      "headline": "Wedbush boosts TSLA PT on energy segment mix",
+      "summaryOriginal": "Wedbush boosts TSLA PT on energy segment mix. Fixture demo article for EventLens chart bubbles.",
+      "summaryAi": null,
+      "source": "Fixture Wire",
+      "url": "https://example.com/tsla_news_11",
+      "publishedAt": "2026-07-30T14:20:11Z",
+      "symbols": [
+        "TSLA"
+      ],
+      "eventType": "analyst",
+      "importance": "medium",
+      "direction": "positive",
+      "timeHorizon": "short_term",
+      "provider": "fixture",
+      "imageUrl": "https://picsum.photos/seed/tsla_news_11/640/360"
+    },
+    {
+      "id": "tsla_news_12",
+      "headline": "Semi truck pilot expands with logistics partner",
+      "summaryOriginal": "Semi truck pilot expands with logistics partner. Fixture demo article for EventLens chart bubbles.",
+      "summaryAi": null,
+      "source": "Fixture Wire",
+      "url": "https://example.com/tsla_news_12",
+      "publishedAt": "2026-07-30T16:28:43Z",
+      "symbols": [
+        "TSLA"
+      ],
+      "eventType": "product",
+      "importance": "medium",
+      "direction": "positive",
+      "timeHorizon": "short_term",
+      "provider": "fixture",
+      "imageUrl": "https://picsum.photos/seed/tsla_news_12/640/360"
+    },
+    {
+      "id": "tsla_news_13",
+      "headline": "Lithium prices stabilize after multi-week slide",
+      "summaryOriginal": "Lithium prices stabilize after multi-week slide. Fixture demo article for EventLens chart bubbles.",
+      "summaryAi": null,
+      "source": "Fixture Wire",
+      "url": "https://example.com/tsla_news_13",
+      "publishedAt": "2026-07-30T18:35:36Z",
+      "symbols": [
+        "TSLA"
+      ],
+      "eventType": "macro",
+      "importance": "low",
+      "direction": "uncertain",
+      "timeHorizon": "short_term",
+      "provider": "fixture",
+      "imageUrl": "https://picsum.photos/seed/tsla_news_13/640/360"
+    },
+    {
+      "id": "tsla_news_14",
+      "headline": "Auto margins stabilize sequentially, CFO says",
+      "summaryOriginal": "Auto margins stabilize sequentially, CFO says. Fixture demo article for EventLens chart bubbles.",
+      "summaryAi": null,
+      "source": "Fixture Wire",
+      "url": "https://example.com/tsla_news_14",
+      "publishedAt": "2026-07-30T20:41:00Z",
+      "symbols": [
+        "TSLA"
+      ],
+      "eventType": "earnings",
+      "importance": "medium",
+      "direction": "positive",
+      "timeHorizon": "short_term",
+      "provider": "fixture",
+      "imageUrl": "https://picsum.photos/seed/tsla_news_14/640/360"
+    }
+  ],
+  "MSFT": [
+    {
+      "id": "msft_news_1",
+      "headline": "Azure growth re-accelerates on AI workload demand",
+      "summaryOriginal": "Azure growth re-accelerates on AI workload demand. Fixture demo article for EventLens chart bubbles.",
+      "summaryAi": null,
+      "source": "Fixture Wire",
+      "url": "https://example.com/msft_news_1",
+      "publishedAt": "2026-07-29T14:00:00Z",
+      "symbols": [
+        "MSFT"
+      ],
+      "eventType": "earnings",
+      "importance": "high",
+      "direction": "positive",
+      "timeHorizon": "short_term",
+      "provider": "fixture",
+      "imageUrl": "https://picsum.photos/seed/msft_news_1/640/360"
+    },
+    {
+      "id": "msft_news_2",
+      "headline": "Microsoft expands Copilot seats for enterprise SKUs",
+      "summaryOriginal": "Microsoft expands Copilot seats for enterprise SKUs. Fixture demo article for EventLens chart bubbles.",
+      "summaryAi": null,
+      "source": "Fixture Wire",
+      "url": "https://example.com/msft_news_2",
+      "publishedAt": "2026-07-29T17:30:25Z",
+      "symbols": [
+        "MSFT"
+      ],
+      "eventType": "product",
+      "importance": "medium",
+      "direction": "positive",
+      "timeHorizon": "short_term",
+      "provider": "fixture",
+      "imageUrl": "https://picsum.photos/seed/msft_news_2/640/360"
+    },
+    {
+      "id": "msft_news_3",
+      "headline": "Bernstein raises MSFT target on cloud mix shift",
+      "summaryOriginal": "Bernstein raises MSFT target on cloud mix shift. Fixture demo article for EventLens chart bubbles.",
+      "summaryAi": null,
+      "source": "Fixture Wire",
+      "url": "https://example.com/msft_news_3",
+      "publishedAt": "2026-07-29T20:20:41Z",
+      "symbols": [
+        "MSFT"
+      ],
+      "eventType": "analyst",
+      "importance": "medium",
+      "direction": "positive",
+      "timeHorizon": "short_term",
+      "provider": "fixture",
+      "imageUrl": "https://picsum.photos/seed/msft_news_3/640/360"
+    },
+    {
+      "id": "msft_news_4",
+      "headline": "EU continues review of cloud licensing practices",
+      "summaryOriginal": "EU continues review of cloud licensing practices. Fixture demo article for EventLens chart bubbles.",
+      "summaryAi": null,
+      "source": "Fixture Wire",
+      "url": "https://example.com/msft_news_4",
+      "publishedAt": "2026-07-29T22:58:34Z",
+      "symbols": [
+        "MSFT"
+      ],
+      "eventType": "regulation",
+      "importance": "medium",
+      "direction": "uncertain",
+      "timeHorizon": "short_term",
+      "provider": "fixture",
+      "imageUrl": "https://picsum.photos/seed/msft_news_4/640/360"
+    },
+    {
+      "id": "msft_news_5",
+      "headline": "Microsoft lifts capex outlook for AI infrastructure",
+      "summaryOriginal": "Microsoft lifts capex outlook for AI infrastructure. Fixture demo article for EventLens chart bubbles.",
+      "summaryAi": null,
+      "source": "Fixture Wire",
+      "url": "https://example.com/msft_news_5",
+      "publishedAt": "2026-07-30T01:28:57Z",
+      "symbols": [
+        "MSFT"
+      ],
+      "eventType": "guidance",
+      "importance": "high",
+      "direction": "positive",
+      "timeHorizon": "short_term",
+      "provider": "fixture",
+      "imageUrl": "https://picsum.photos/seed/msft_news_5/640/360"
+    },
+    {
+      "id": "msft_news_6",
+      "headline": "Mega-cap tech tracks Nasdaq futures overnight",
+      "summaryOriginal": "Mega-cap tech tracks Nasdaq futures overnight. Fixture demo article for EventLens chart bubbles.",
+      "summaryAi": null,
+      "source": "Fixture Wire",
+      "url": "https://example.com/msft_news_6",
+      "publishedAt": "2026-07-30T03:53:59Z",
+      "symbols": [
+        "MSFT"
+      ],
+      "eventType": "macro",
+      "importance": "low",
+      "direction": "uncertain",
+      "timeHorizon": "short_term",
+      "provider": "fixture",
+      "imageUrl": null
+    },
+    {
+      "id": "msft_news_7",
+      "headline": "GitHub Copilot usage doubles among Fortune 500",
+      "summaryOriginal": "GitHub Copilot usage doubles among Fortune 500. Fixture demo article for EventLens chart bubbles.",
+      "summaryAi": null,
+      "source": "Fixture Wire",
+      "url": "https://example.com/msft_news_7",
+      "publishedAt": "2026-07-30T06:14:55Z",
+      "symbols": [
+        "MSFT"
+      ],
+      "eventType": "product",
+      "importance": "medium",
+      "direction": "positive",
+      "timeHorizon": "short_term",
+      "provider": "fixture",
+      "imageUrl": "https://picsum.photos/seed/msft_news_7/640/360"
+    },
+    {
+      "id": "msft_news_8",
+      "headline": "Microsoft schedules Ignite keynote lineup",
+      "summaryOriginal": "Microsoft schedules Ignite keynote lineup. Fixture demo article for EventLens chart bubbles.",
+      "summaryAi": null,
+      "source": "Fixture Wire",
+      "url": "https://example.com/msft_news_8",
+      "publishedAt": "2026-07-30T08:32:32Z",
+      "symbols": [
+        "MSFT"
+      ],
+      "eventType": "company_update",
+      "importance": "low",
+      "direction": "neutral",
+      "timeHorizon": "short_term",
+      "provider": "fixture",
+      "imageUrl": null
+    },
+    {
+      "id": "msft_news_9",
+      "headline": "Activision-related residual claims persist in court",
+      "summaryOriginal": "Activision-related residual claims persist in court. Fixture demo article for EventLens chart bubbles.",
+      "summaryAi": null,
+      "source": "Fixture Wire",
+      "url": "https://example.com/msft_news_9",
+      "publishedAt": "2026-07-30T09:57:22Z",
+      "symbols": [
+        "MSFT"
+      ],
+      "eventType": "legal",
+      "importance": "low",
+      "direction": "negative",
+      "timeHorizon": "short_term",
+      "provider": "fixture",
+      "imageUrl": null
+    },
+    {
+      "id": "msft_news_10",
+      "headline": "Barclays sees upside to Office commercial ARPU",
+      "summaryOriginal": "Barclays sees upside to Office commercial ARPU. Fixture demo article for EventLens chart bubbles.",
+      "summaryAi": null,
+      "source": "Fixture Wire",
+      "url": "https://example.com/msft_news_10",
+      "publishedAt": "2026-07-30T12:09:49Z",
+      "symbols": [
+        "MSFT"
+      ],
+      "eventType": "analyst",
+      "importance": "medium",
+      "direction": "positive",
+      "timeHorizon": "short_term",
+      "provider": "fixture",
+      "imageUrl": "https://picsum.photos/seed/msft_news_10/640/360"
+    },
+    {
+      "id": "msft_news_11",
+      "headline": "Windows AI features expand to more OEM devices",
+      "summaryOriginal": "Windows AI features expand to more OEM devices. Fixture demo article for EventLens chart bubbles.",
+      "summaryAi": null,
+      "source": "Fixture Wire",
+      "url": "https://example.com/msft_news_11",
+      "publishedAt": "2026-07-30T14:20:11Z",
+      "symbols": [
+        "MSFT"
+      ],
+      "eventType": "product",
+      "importance": "medium",
+      "direction": "positive",
+      "timeHorizon": "short_term",
+      "provider": "fixture",
+      "imageUrl": "https://picsum.photos/seed/msft_news_11/640/360"
+    },
+    {
+      "id": "msft_news_12",
+      "headline": "Microsoft cloud sales org realigns by industry",
+      "summaryOriginal": "Microsoft cloud sales org realigns by industry. Fixture demo article for EventLens chart bubbles.",
+      "summaryAi": null,
+      "source": "Fixture Wire",
+      "url": "https://example.com/msft_news_12",
+      "publishedAt": "2026-07-30T16:28:43Z",
+      "symbols": [
+        "MSFT"
+      ],
+      "eventType": "management",
+      "importance": "low",
+      "direction": "neutral",
+      "timeHorizon": "short_term",
+      "provider": "fixture",
+      "imageUrl": null
+    },
+    {
+      "id": "msft_news_13",
+      "headline": "LinkedIn ads recover faster than expected",
+      "summaryOriginal": "LinkedIn ads recover faster than expected. Fixture demo article for EventLens chart bubbles.",
+      "summaryAi": null,
+      "source": "Fixture Wire",
+      "url": "https://example.com/msft_news_13",
+      "publishedAt": "2026-07-30T18:35:36Z",
+      "symbols": [
+        "MSFT"
+      ],
+      "eventType": "earnings",
+      "importance": "medium",
+      "direction": "positive",
+      "timeHorizon": "short_term",
+      "provider": "fixture",
+      "imageUrl": "https://picsum.photos/seed/msft_news_13/640/360"
+    },
+    {
+      "id": "msft_news_14",
+      "headline": "Software peers mixed into month-end rebalance",
+      "summaryOriginal": "Software peers mixed into month-end rebalance. Fixture demo article for EventLens chart bubbles.",
+      "summaryAi": null,
+      "source": "Fixture Wire",
+      "url": "https://example.com/msft_news_14",
+      "publishedAt": "2026-07-30T20:41:00Z",
+      "symbols": [
+        "MSFT"
+      ],
+      "eventType": "macro",
+      "importance": "medium",
+      "direction": "uncertain",
+      "timeHorizon": "short_term",
+      "provider": "fixture",
+      "imageUrl": "https://picsum.photos/seed/msft_news_14/640/360"
+    }
+  ],
+  "META": [
+    {
+      "id": "meta_news_1",
+      "headline": "Meta ad revenue surge driven by Reels monetization",
+      "summaryOriginal": "Meta ad revenue surge driven by Reels monetization. Fixture demo article for EventLens chart bubbles.",
+      "summaryAi": null,
+      "source": "Fixture Wire",
+      "url": "https://example.com/meta_news_1",
+      "publishedAt": "2026-07-29T14:00:00Z",
+      "symbols": [
+        "META"
+      ],
+      "eventType": "earnings",
+      "importance": "high",
+      "direction": "positive",
+      "timeHorizon": "short_term",
+      "provider": "fixture",
+      "imageUrl": "https://picsum.photos/seed/meta_news_1/640/360"
+    },
+    {
+      "id": "meta_news_2",
+      "headline": "Llama model update improves multimodal benchmarks",
+      "summaryOriginal": "Llama model update improves multimodal benchmarks. Fixture demo article for EventLens chart bubbles.",
+      "summaryAi": null,
+      "source": "Fixture Wire",
+      "url": "https://example.com/meta_news_2",
+      "publishedAt": "2026-07-29T17:30:25Z",
+      "symbols": [
+        "META"
+      ],
+      "eventType": "product",
+      "importance": "medium",
+      "direction": "positive",
+      "timeHorizon": "short_term",
+      "provider": "fixture",
+      "imageUrl": "https://picsum.photos/seed/meta_news_2/640/360"
+    },
+    {
+      "id": "meta_news_3",
+      "headline": "Deutsche Bank upgrades META on efficiency gains",
+      "summaryOriginal": "Deutsche Bank upgrades META on efficiency gains. Fixture demo article for EventLens chart bubbles.",
+      "summaryAi": null,
+      "source": "Fixture Wire",
+      "url": "https://example.com/meta_news_3",
+      "publishedAt": "2026-07-29T20:20:41Z",
+      "symbols": [
+        "META"
+      ],
+      "eventType": "analyst",
+      "importance": "medium",
+      "direction": "positive",
+      "timeHorizon": "short_term",
+      "provider": "fixture",
+      "imageUrl": "https://picsum.photos/seed/meta_news_3/640/360"
+    },
+    {
+      "id": "meta_news_4",
+      "headline": "New state privacy bills target targeted advertising",
+      "summaryOriginal": "New state privacy bills target targeted advertising. Fixture demo article for EventLens chart bubbles.",
+      "summaryAi": null,
+      "source": "Fixture Wire",
+      "url": "https://example.com/meta_news_4",
+      "publishedAt": "2026-07-29T22:58:34Z",
+      "symbols": [
+        "META"
+      ],
+      "eventType": "regulation",
+      "importance": "high",
+      "direction": "negative",
+      "timeHorizon": "short_term",
+      "provider": "fixture",
+      "imageUrl": "https://picsum.photos/seed/meta_news_4/640/360"
+    },
+    {
+      "id": "meta_news_5",
+      "headline": "Meta reiterates Reality Labs spend discipline",
+      "summaryOriginal": "Meta reiterates Reality Labs spend discipline. Fixture demo article for EventLens chart bubbles.",
+      "summaryAi": null,
+      "source": "Fixture Wire",
+      "url": "https://example.com/meta_news_5",
+      "publishedAt": "2026-07-30T01:28:57Z",
+      "symbols": [
+        "META"
+      ],
+      "eventType": "guidance",
+      "importance": "medium",
+      "direction": "positive",
+      "timeHorizon": "short_term",
+      "provider": "fixture",
+      "imageUrl": "https://picsum.photos/seed/meta_news_5/640/360"
+    },
+    {
+      "id": "meta_news_6",
+      "headline": "Ad platforms track consumer spending surprise",
+      "summaryOriginal": "Ad platforms track consumer spending surprise. Fixture demo article for EventLens chart bubbles.",
+      "summaryAi": null,
+      "source": "Fixture Wire",
+      "url": "https://example.com/meta_news_6",
+      "publishedAt": "2026-07-30T03:53:59Z",
+      "symbols": [
+        "META"
+      ],
+      "eventType": "macro",
+      "importance": "medium",
+      "direction": "uncertain",
+      "timeHorizon": "short_term",
+      "provider": "fixture",
+      "imageUrl": "https://picsum.photos/seed/meta_news_6/640/360"
+    },
+    {
+      "id": "meta_news_7",
+      "headline": "Instagram tests AI shopping assistants in US",
+      "summaryOriginal": "Instagram tests AI shopping assistants in US. Fixture demo article for EventLens chart bubbles.",
+      "summaryAi": null,
+      "source": "Fixture Wire",
+      "url": "https://example.com/meta_news_7",
+      "publishedAt": "2026-07-30T06:14:55Z",
+      "symbols": [
+        "META"
+      ],
+      "eventType": "product",
+      "importance": "low",
+      "direction": "positive",
+      "timeHorizon": "short_term",
+      "provider": "fixture",
+      "imageUrl": "https://picsum.photos/seed/meta_news_7/640/360"
+    },
+    {
+      "id": "meta_news_8",
+      "headline": "Meta opens new AI research hub hiring round",
+      "summaryOriginal": "Meta opens new AI research hub hiring round. Fixture demo article for EventLens chart bubbles.",
+      "summaryAi": null,
+      "source": "Fixture Wire",
+      "url": "https://example.com/meta_news_8",
+      "publishedAt": "2026-07-30T08:32:32Z",
+      "symbols": [
+        "META"
+      ],
+      "eventType": "company_update",
+      "importance": "medium",
+      "direction": "neutral",
+      "timeHorizon": "short_term",
+      "provider": "fixture",
+      "imageUrl": "https://picsum.photos/seed/meta_news_8/640/360"
+    },
+    {
+      "id": "meta_news_9",
+      "headline": "FTC continues scrutiny of youth safety practices",
+      "summaryOriginal": "FTC continues scrutiny of youth safety practices. Fixture demo article for EventLens chart bubbles.",
+      "summaryAi": null,
+      "source": "Fixture Wire",
+      "url": "https://example.com/meta_news_9",
+      "publishedAt": "2026-07-30T09:57:22Z",
+      "symbols": [
+        "META"
+      ],
+      "eventType": "legal",
+      "importance": "medium",
+      "direction": "negative",
+      "timeHorizon": "short_term",
+      "provider": "fixture",
+      "imageUrl": "https://picsum.photos/seed/meta_news_9/640/360"
+    },
+    {
+      "id": "meta_news_10",
+      "headline": "RBC cites operating leverage into H2",
+      "summaryOriginal": "RBC cites operating leverage into H2. Fixture demo article for EventLens chart bubbles.",
+      "summaryAi": null,
+      "source": "Fixture Wire",
+      "url": "https://example.com/meta_news_10",
+      "publishedAt": "2026-07-30T12:09:49Z",
+      "symbols": [
+        "META"
+      ],
+      "eventType": "analyst",
+      "importance": "medium",
+      "direction": "positive",
+      "timeHorizon": "short_term",
+      "provider": "fixture",
+      "imageUrl": "https://picsum.photos/seed/meta_news_10/640/360"
+    },
+    {
+      "id": "meta_news_11",
+      "headline": "WhatsApp business API volumes hit new highs",
+      "summaryOriginal": "WhatsApp business API volumes hit new highs. Fixture demo article for EventLens chart bubbles.",
+      "summaryAi": null,
+      "source": "Fixture Wire",
+      "url": "https://example.com/meta_news_11",
+      "publishedAt": "2026-07-30T14:20:11Z",
+      "symbols": [
+        "META"
+      ],
+      "eventType": "product",
+      "importance": "medium",
+      "direction": "positive",
+      "timeHorizon": "short_term",
+      "provider": "fixture",
+      "imageUrl": "https://picsum.photos/seed/meta_news_11/640/360"
+    },
+    {
+      "id": "meta_news_12",
+      "headline": "Family of Apps DAU growth remains resilient",
+      "summaryOriginal": "Family of Apps DAU growth remains resilient. Fixture demo article for EventLens chart bubbles.",
+      "summaryAi": null,
+      "source": "Fixture Wire",
+      "url": "https://example.com/meta_news_12",
+      "publishedAt": "2026-07-30T16:28:43Z",
+      "symbols": [
+        "META"
+      ],
+      "eventType": "earnings",
+      "importance": "medium",
+      "direction": "positive",
+      "timeHorizon": "short_term",
+      "provider": "fixture",
+      "imageUrl": "https://picsum.photos/seed/meta_news_12/640/360"
+    },
+    {
+      "id": "meta_news_13",
+      "headline": "Social ad peers diverge after retail prints",
+      "summaryOriginal": "Social ad peers diverge after retail prints. Fixture demo article for EventLens chart bubbles.",
+      "summaryAi": null,
+      "source": "Fixture Wire",
+      "url": "https://example.com/meta_news_13",
+      "publishedAt": "2026-07-30T18:35:36Z",
+      "symbols": [
+        "META"
+      ],
+      "eventType": "macro",
+      "importance": "low",
+      "direction": "uncertain",
+      "timeHorizon": "short_term",
+      "provider": "fixture",
+      "imageUrl": "https://picsum.photos/seed/meta_news_13/640/360"
+    },
+    {
+      "id": "meta_news_14",
+      "headline": "Meta CFO to speak at media conference",
+      "summaryOriginal": "Meta CFO to speak at media conference. Fixture demo article for EventLens chart bubbles.",
+      "summaryAi": null,
+      "source": "Fixture Wire",
+      "url": "https://example.com/meta_news_14",
+      "publishedAt": "2026-07-30T20:41:00Z",
+      "symbols": [
+        "META"
+      ],
+      "eventType": "management",
+      "importance": "low",
+      "direction": "neutral",
+      "timeHorizon": "short_term",
+      "provider": "fixture",
+      "imageUrl": null
+    }
+  ]
+}
