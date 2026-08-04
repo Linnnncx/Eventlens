@@ -172,50 +172,6 @@ cd frontend
 npm test
 ```
 
-## 上传 / 更新到 GitHub
-
-远程已配置为：`https://github.com/Linnnncx/Eventlens.git`（`origin`）。
-
-**首次推送大量本地改动（当前工作区相对 `main` 有很多未提交变更）：**
-
-```bash
-cd "d:\Cursor project\stock system\eventlens"
-
-git status
-git add -A
-# 确认没有误加 .env / *.db / llm_settings.json
-git status
-
-git commit -m "$(cat <<'EOF'
-Ship mobile app, AI range analysis, and deployment-ready Docker setup.
-
-EOF
-)"
-
-git push -u origin main
-```
-
-Windows PowerShell 若 HEREDOC 不便，可用：
-
-```powershell
-git commit -m "Ship mobile app, AI range analysis, and deployment-ready Docker setup."
-git push origin main
-```
-
-**之后日常更新：**
-
-```bash
-git add -A
-git commit -m "简述本次改动"
-git push origin main
-```
-
-注意：
-
-- 不要提交 `.env`、密钥、本地 SQLite  
-- 若 `git push` 被拒，先 `git pull --rebase origin main` 再推  
-- 需要我代为执行 commit / push 时，在对话里明确说「请提交并推送到 GitHub」即可  
-
 ## 已知限制
 
 - yfinance 日内数据有时间范围限制；后端会裁剪请求窗口  
