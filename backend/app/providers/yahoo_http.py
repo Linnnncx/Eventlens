@@ -11,7 +11,9 @@ import xml.etree.ElementTree as ET
 from datetime import datetime, timezone
 from email.utils import parsedate_to_datetime
 from functools import lru_cache
+from math import isfinite
 from typing import Any
+from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
 import requests
 
@@ -130,14 +132,50 @@ def chart_to_ohlcv(result: dict[str, Any]) -> list[dict[str, Any]]:
     timestamps = result.get("timestamp") or []
     indicators = (result.get("indicators") or {}).get("quote") or [{}]
     quote = indicators[0] if indicators else {}
+    meta = result.get("meta") or {}
     opens = quote.get("open") or []
     highs = quote.get("high") or []
     lows = quote.get("low") or []
     closes = quote.get("close") or []
     volumes = quote.get("volume") or []
+
+    # Yahoo occasionally publishes the newest daily candle with valid O/H/L/V but
+    # a null close. Its quote metadata already contains the same session's latest
+    # price; use that only for the final candle and only when both timestamps fall
+    # on the same exchange-local trading date. This avoids dropping the newest
+    # session without inventing values for genuine historical gaps.
+    latest_price: float | None = None
+    try:
+        candidate = float(meta.get("regularMarketPrice"))
+        if isfinite(candidate):
+            latest_price = candidate
+    except (TypeError, ValueError):
+        pass
+
+    latest_market_time: float | None = None
+    try:
+        candidate_time = float(meta.get("regularMarketTime"))
+        if isfinite(candidate_time):
+            latest_market_time = candidate_time
+    except (TypeError, ValueError):
+        pass
+
+    try:
+        exchange_tz = ZoneInfo(str(meta.get("exchangeTimezoneName") or "UTC"))
+    except (ZoneInfoNotFoundError, ValueError):
+        exchange_tz = timezone.utc
+
     rows: list[dict[str, Any]] = []
     for i, ts in enumerate(timestamps):
         c = closes[i] if i < len(closes) else None
+        if c is None and i == len(timestamps) - 1 and latest_price is not None and latest_market_time is not None:
+            try:
+                bar_date = datetime.fromtimestamp(float(ts), tz=exchange_tz).date()
+                quote_date = datetime.fromtimestamp(latest_market_time, tz=exchange_tz).date()
+                if bar_date == quote_date:
+                    c = latest_price
+            except (OSError, OverflowError, TypeError, ValueError):
+                pass
         if c is None:
             continue
         rows.append(
