@@ -1,14 +1,23 @@
-import { useCallback } from 'react';
+import { lazy, Suspense, useCallback } from 'react';
 import { Routes, Route, NavLink, useLocation, Navigate } from 'react-router-dom';
 import { useQueryClient } from '@tanstack/react-query';
 import { LineChart, Newspaper, Wallet, User } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 import { MobileMarketPage } from './pages/MobileMarketPage';
-import { MobileNewsPage } from './pages/MobileNewsPage';
-import { MobileTradePage } from './pages/MobileTradePage';
-import { MobileProfilePage } from './pages/MobileProfilePage';
-import { MobileStockPage } from './pages/MobileStockPage';
 import { PullToRefresh } from './components/PullToRefresh';
+
+const MobileNewsPage = lazy(() =>
+  import('./pages/MobileNewsPage').then((module) => ({ default: module.MobileNewsPage })),
+);
+const MobileTradePage = lazy(() =>
+  import('./pages/MobileTradePage').then((module) => ({ default: module.MobileTradePage })),
+);
+const MobileProfilePage = lazy(() =>
+  import('./pages/MobileProfilePage').then((module) => ({ default: module.MobileProfilePage })),
+);
+const MobileStockPage = lazy(() =>
+  import('./pages/MobileStockPage').then((module) => ({ default: module.MobileStockPage })),
+);
 
 interface TabDef {
   to: string;
@@ -45,6 +54,14 @@ function TabBar() {
   );
 }
 
+function MobileRouteLoading() {
+  return (
+    <div className="flex min-h-full items-center justify-center bg-surface text-sm text-muted">
+      正在加载页面…
+    </div>
+  );
+}
+
 export function MobileApp() {
   const location = useLocation();
   const queryClient = useQueryClient();
@@ -72,14 +89,16 @@ export function MobileApp() {
   }, [location.pathname, queryClient]);
 
   const routes = (
-    <Routes>
-      <Route path="/" element={<MobileMarketPage />} />
-      <Route path="/news" element={<MobileNewsPage />} />
-      <Route path="/trade" element={<MobileTradePage />} />
-      <Route path="/me" element={<MobileProfilePage />} />
-      <Route path="/workbench/:symbol" element={<MobileStockPage />} />
-      <Route path="*" element={<Navigate to="/" replace />} />
-    </Routes>
+    <Suspense fallback={<MobileRouteLoading />}>
+      <Routes>
+        <Route path="/" element={<MobileMarketPage />} />
+        <Route path="/news" element={<MobileNewsPage />} />
+        <Route path="/trade" element={<MobileTradePage />} />
+        <Route path="/me" element={<MobileProfilePage />} />
+        <Route path="/workbench/:symbol" element={<MobileStockPage />} />
+        <Route path="*" element={<Navigate to="/" replace />} />
+      </Routes>
+    </Suspense>
   );
 
   return (
