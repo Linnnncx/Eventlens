@@ -258,6 +258,13 @@ class OrderPreviewRequest(BaseModel):
     model_config = {"populate_by_name": True}
 
 
+class OrderModifyRequest(BaseModel):
+    quantity: float = Field(gt=0)
+    limit_price: float = Field(alias="limitPrice", gt=0)
+
+    model_config = {"populate_by_name": True}
+
+
 class OrderPreviewResponse(BaseModel):
     estimated_value: float = Field(alias="estimatedValue")
     estimated_fee: float = Field(alias="estimatedFee")

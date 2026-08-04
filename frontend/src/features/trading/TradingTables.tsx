@@ -1,6 +1,8 @@
-import type { ReactNode } from 'react';
+import { Fragment, useState, type ReactNode } from 'react';
 import { Link } from 'react-router-dom';
+import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { EmptyState } from '../../components/EmptyState';
+import { cancelOrder, modifyOrder } from '../../api/endpoints';
 import type { Order, Position, Trade } from '../../types/api';
 import {
   changeColorClass,
@@ -220,6 +222,28 @@ export function OrdersTable({
   activeSymbol?: string;
   emptyLabel?: string;
 }) {
+  const queryClient = useQueryClient();
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [editQuantity, setEditQuantity] = useState('');
+  const [editLimitPrice, setEditLimitPrice] = useState('');
+
+  const refreshOrders = () => {
+    queryClient.invalidateQueries({ queryKey: ['orders'] });
+    queryClient.invalidateQueries({ queryKey: ['portfolio'] });
+  };
+  const cancelMutation = useMutation({
+    mutationFn: (id: string) => cancelOrder(id),
+    onSuccess: refreshOrders,
+  });
+  const modifyMutation = useMutation({
+    mutationFn: ({ id, quantity, limitPrice }: { id: string; quantity: number; limitPrice: number }) =>
+      modifyOrder(id, { quantity, limitPrice }),
+    onSuccess: () => {
+      setEditingId(null);
+      refreshOrders();
+    },
+  });
+
   if (orders.length === 0) {
     return <EmptyState title={emptyLabel} description="提交的模拟委托会出现在这里" />;
   }
@@ -227,30 +251,110 @@ export function OrdersTable({
     <DataTable headers={ORDER_HEADERS}>
       {orders.map((o) => {
         const active = activeSymbol === o.symbol;
+        const actionable = o.status === 'open' || o.status === 'pending';
+        const editing = editingId === o.id;
         return (
-          <tr
-            key={o.id}
-            className={`tabular hover:bg-surface-hover/80 ${active ? 'bg-primary/5' : ''}`}
-          >
-            <td className="px-2.5 py-2">
-              <Link to={`/workbench/${o.symbol}`} className="font-semibold hover:text-primary">
-                {o.symbol}
-              </Link>
-            </td>
-            <td className="px-2.5 py-2 text-center">
-              <SideBadge side={o.side} />
-            </td>
-            <td className="px-2.5 py-2 uppercase text-muted">{o.orderType}</td>
-            <td className="px-2.5 py-2 text-right">{orderPrice(o)}</td>
-            <td className="px-2.5 py-2 text-right">{formatPrice(o.quantity, 0)}</td>
-            <td className="px-2.5 py-2 text-muted">{fmtTime(o.createdAt)}</td>
-            <td className={`px-2.5 py-2 text-center font-medium ${statusClass(o.status)}`}>
-              {statusLabel(o.status)}
-            </td>
-            <td className="px-2.5 py-2 text-right text-muted">
-              {o.fee != null ? formatCurrency(o.fee) : '—'}
-            </td>
-          </tr>
+          <Fragment key={o.id}>
+            <tr className={`tabular hover:bg-surface-hover/80 ${active ? 'bg-primary/5' : ''}`}>
+              <td className="px-2.5 py-2">
+                <Link to={`/workbench/${o.symbol}`} className="font-semibold hover:text-primary">
+                  {o.symbol}
+                </Link>
+              </td>
+              <td className="px-2.5 py-2 text-center"><SideBadge side={o.side} /></td>
+              <td className="px-2.5 py-2 uppercase text-muted">{o.orderType}</td>
+              <td className="px-2.5 py-2 text-right">{orderPrice(o)}</td>
+              <td className="px-2.5 py-2 text-right">{formatPrice(o.quantity, 0)}</td>
+              <td className="px-2.5 py-2 text-muted">{fmtTime(o.createdAt)}</td>
+              <td className="px-2.5 py-2">
+                <div className="flex items-center justify-center gap-1.5 whitespace-nowrap">
+                  <span className={`font-medium ${statusClass(o.status)}`}>
+                    {statusLabel(o.status)}
+                  </span>
+                  {actionable ? (
+                    <>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setEditingId(editing ? null : o.id);
+                          setEditQuantity(String(o.quantity));
+                          setEditLimitPrice(String(o.limitPrice ?? ''));
+                        }}
+                        className="rounded-md border border-primary/40 px-2 py-1 text-xs text-primary hover:bg-primary/10"
+                      >
+                        改单
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => cancelMutation.mutate(o.id)}
+                        disabled={cancelMutation.isPending && cancelMutation.variables === o.id}
+                        className="rounded-md border border-down/40 px-2 py-1 text-xs text-down hover:bg-down/10 disabled:opacity-50"
+                      >
+                        撤单
+                      </button>
+                    </>
+                  ) : null}
+                </div>
+              </td>
+              <td className="px-2.5 py-2 text-right text-muted">
+                {o.fee != null ? formatCurrency(o.fee) : '—'}
+              </td>
+            </tr>
+            {editing ? (
+              <tr className="bg-primary/[0.04]">
+                <td colSpan={8} className="px-3 py-3">
+                  <div className="flex flex-wrap items-end gap-3">
+                    <label className="text-xs text-muted">
+                      数量
+                      <input
+                        type="number"
+                        min="0.0001"
+                        step="any"
+                        value={editQuantity}
+                        onChange={(event) => setEditQuantity(event.target.value)}
+                        className="mt-1 block w-32 rounded-md border border-border bg-surface px-2.5 py-2 text-gray-100 outline-none focus:border-primary"
+                      />
+                    </label>
+                    <label className="text-xs text-muted">
+                      限价
+                      <input
+                        type="number"
+                        min="0.01"
+                        step="0.01"
+                        value={editLimitPrice}
+                        onChange={(event) => setEditLimitPrice(event.target.value)}
+                        className="mt-1 block w-32 rounded-md border border-border bg-surface px-2.5 py-2 text-gray-100 outline-none focus:border-primary"
+                      />
+                    </label>
+                    <button
+                      type="button"
+                      disabled={
+                        modifyMutation.isPending ||
+                        Number(editQuantity) <= 0 ||
+                        Number(editLimitPrice) <= 0
+                      }
+                      onClick={() =>
+                        modifyMutation.mutate({
+                          id: o.id,
+                          quantity: Number(editQuantity),
+                          limitPrice: Number(editLimitPrice),
+                        })
+                      }
+                      className="btn-primary px-4 py-2 text-xs disabled:opacity-50"
+                    >
+                      {modifyMutation.isPending ? '保存中…' : '确认改单'}
+                    </button>
+                    <button type="button" onClick={() => setEditingId(null)} className="btn-ghost px-3 py-2 text-xs">
+                      取消
+                    </button>
+                    {modifyMutation.isError ? (
+                      <span className="text-xs text-down">改单失败，请检查数量和价格</span>
+                    ) : null}
+                  </div>
+                </td>
+              </tr>
+            ) : null}
+          </Fragment>
         );
       })}
     </DataTable>

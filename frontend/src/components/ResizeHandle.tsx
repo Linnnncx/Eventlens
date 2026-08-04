@@ -134,7 +134,7 @@ export const DEFAULT_LAYOUT: WorkbenchLayout = {
   rightWidth: 520,
   chartHeight: 360,
   indicatorHeight: 240,
-  bottomHeight: 420,
+  bottomHeight: 1300,
 };
 
 const STORAGE_KEY = 'eventlens.workbench.layout.v3';
@@ -146,7 +146,7 @@ const LIMITS = {
   indicatorHeight: { min: 100, max: 1200 },
   // The lower workspace is intentionally fixed: its content scrolls internally
   // instead of making the page progressively deeper.
-  bottomHeight: { min: 420, max: 420 },
+  bottomHeight: { min: 1300, max: 1300 },
 } as const;
 
 function clamp(key: keyof WorkbenchLayout, value: number): number {

@@ -148,6 +148,12 @@ export function QuickOrderBox({ symbol, newsId, price = 0, onClose, inline = fal
     },
   });
 
+  useEffect(() => {
+    if (!submitMut.isSuccess) return;
+    const timer = window.setTimeout(() => submitMut.reset(), 2_000);
+    return () => window.clearTimeout(timer);
+  }, [submitMut.isSuccess]);
+
   const flushDragFrame = useCallback(() => {
     rafDragRef.current = null;
     const next = pendingPosRef.current;
@@ -478,7 +484,7 @@ export function QuickOrderBox({ symbol, newsId, price = 0, onClose, inline = fal
 
         {submitMut.isSuccess && (
           <p className="flex items-center gap-1.5 text-sm text-up">
-            <CheckCircle2 className="h-4 w-4" /> 模拟成交成功
+            <CheckCircle2 className="h-4 w-4" /> 成功下单
           </p>
         )}
         {submitMut.isError && (

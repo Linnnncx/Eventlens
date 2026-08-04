@@ -81,7 +81,9 @@ async def get_shared_quote(
             _refresh_in_background(symbol, max_age)
             return stored, provider, True
 
-    quote, provider = await _fetch_and_store(symbol, max_age)
+    # ``allow_stale=False`` is used by live UI paths. Force bypassing a primed
+    # persisted in-memory quote as well as the SQLite fallback.
+    quote, provider = await _fetch_and_store(symbol, max_age, force=not allow_stale)
     return quote, provider, False
 
 

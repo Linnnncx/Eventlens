@@ -12,7 +12,13 @@ from app.core.config import get_settings
 from app.database.session import OrderRow, PortfolioRow, PositionRow, TradeRow, WatchlistRow
 from app.providers.llm.providers import RuleBasedLLMProvider
 from app.providers.market.fixture_provider import find_universe
-from app.schemas.market import OrderPreviewRequest, OrderPreviewResponse, PortfolioState, RiskSummary
+from app.schemas.market import (
+    OrderModifyRequest,
+    OrderPreviewRequest,
+    OrderPreviewResponse,
+    PortfolioState,
+    RiskSummary,
+)
 from app.services.fees import calc_futu_us_fee
 from app.services.market_hub import get_shared_quote
 
@@ -321,6 +327,54 @@ def list_orders(db: Session, limit: int = 100) -> list[dict[str, Any]]:
     )
     fees = {oid: float(fee) for oid, fee in fee_rows}
     return [serialize_order(r, fees.get(r.id)) for r in rows]
+
+
+def cancel_open_order(db: Session, order_id: str) -> dict[str, Any]:
+    row = db.query(OrderRow).filter(OrderRow.id == order_id).first()
+    if row is None:
+        raise LookupError("Order not found")
+    if row.status not in {"open", "pending"}:
+        raise ValueError("Only unfilled orders can be canceled")
+    row.status = "canceled"
+    db.commit()
+    db.refresh(row)
+    return serialize_order(row)
+
+
+async def modify_open_order(
+    db: Session,
+    order_id: str,
+    req: OrderModifyRequest,
+) -> dict[str, Any]:
+    row = db.query(OrderRow).filter(OrderRow.id == order_id).first()
+    if row is None:
+        raise LookupError("Order not found")
+    if row.status not in {"open", "pending"}:
+        raise ValueError("Only unfilled orders can be modified")
+    if row.order_type != "limit":
+        raise ValueError("Only limit orders can be modified")
+
+    preview = await preview_order(
+        db,
+        OrderPreviewRequest(
+            symbol=row.symbol,
+            side=row.side,
+            orderType="limit",
+            quantity=req.quantity,
+            limitPrice=req.limit_price,
+            stopLoss=row.stop_loss,
+            takeProfit=row.take_profit,
+            newsId=row.news_id,
+        ),
+    )
+    if not preview.can_submit:
+        raise ValueError(preview.reject_reason or "Order modification is invalid")
+
+    row.quantity = preview.quantity
+    row.limit_price = req.limit_price
+    db.commit()
+    db.refresh(row)
+    return serialize_order(row)
 
 
 def list_trades(db: Session, limit: int = 100) -> list[dict[str, Any]]:

@@ -395,6 +395,14 @@ export interface WsQuoteMessage {
   type: 'quote';
   symbol: string;
   price: number;
+  previousClose: number;
+  change: number;
+  changePercent: number;
+  dayHigh: number;
+  dayLow: number;
+  volume: number;
+  marketState: string;
+  delayed: boolean;
   timestamp: string;
   provider: string;
 }

@@ -124,6 +124,16 @@ export function MobileOrderSheet({
     },
   });
 
+  useEffect(() => {
+    if (step !== 'done') return;
+    const timer = window.setTimeout(() => {
+      submit.reset();
+      setStep('form');
+      onClose();
+    }, 2_000);
+    return () => window.clearTimeout(timer);
+  }, [step]);
+
   const estValue = preview?.estimatedValue ?? refPrice * quantity;
   const estFee = preview?.estimatedFee ?? 0;
   const reveal = Math.min(1, pullY / DISMISS_DISTANCE);
@@ -220,7 +230,7 @@ export function MobileOrderSheet({
                 <Check className="h-7 w-7 text-up" />
               </div>
               <div className="text-[15px] font-semibold text-gray-100">
-                {submit.data?.status === 'filled' ? '已成交' : '委托已提交'}
+                成功下单
               </div>
               <div className="tabular text-[13px] text-muted">
                 {side === 'buy' ? '买入' : '卖出'} {symbol} {quantity} 股 @ $

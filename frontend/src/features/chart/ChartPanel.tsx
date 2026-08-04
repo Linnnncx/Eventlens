@@ -87,6 +87,8 @@ export interface BarHoverPayload {
 
 interface ChartPanelProps {
   bars: Bar[];
+  /** Shared quote keeps the chart's current-price label aligned with the page. */
+  livePrice?: number;
   newsItems?: NewsItem[];
   timeframe: Timeframe;
   selectedEventId?: string | null;
@@ -151,6 +153,7 @@ const LINE_BASE = {
 
 export function ChartPanel({
   bars,
+  livePrice,
   newsItems = [],
   timeframe,
   selectedEventId,
@@ -1039,6 +1042,22 @@ export function ChartPanel({
     overlayData,
     symbol,
   ]);
+
+  // Render the live quote into the current candle without mutating the source
+  // bars. News anchors and indicator calculations therefore keep their exact
+  // original timestamps while the right-axis price matches the page header.
+  useEffect(() => {
+    const candles = candleRef.current;
+    const last = bars[bars.length - 1];
+    if (!candles || !last || livePrice == null || !Number.isFinite(livePrice) || livePrice <= 0) return;
+    candles.update({
+      time: toSec(last.timestamp) as Time,
+      open: last.open,
+      high: Math.max(last.high, livePrice),
+      low: Math.min(last.low, livePrice),
+      close: livePrice,
+    });
+  }, [bars, livePrice]);
 
   // Cost line updates independently so portfolio polls don't rewrite all series.
   const avgCost = position?.avgCost;

@@ -2,7 +2,9 @@ from __future__ import annotations
 
 import asyncio
 from datetime import datetime, timedelta, timezone
+from math import isfinite
 from typing import Any
+from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
 import pandas as pd
 import yfinance as yf
@@ -20,6 +22,47 @@ from app.providers.market.fixture_provider import (
     universe_profiles,
 )
 from app.schemas.market import Bar, MarketStatus, Quote, Snapshot, SymbolProfile
+
+
+def previous_session_close(rows: list[dict[str, Any]], meta: dict[str, Any], price: float) -> float:
+    """Return the immediately preceding trading session close.
+
+    Yahoo's ``chartPreviousClose`` is the close before the requested *range*,
+    not necessarily yesterday's close. For a 5-day chart it can therefore be
+    several sessions old and produce a wildly wrong live change percentage.
+    """
+    if len(rows) >= 2:
+        try:
+            market_time = float(meta.get("regularMarketTime"))
+            try:
+                exchange_tz = ZoneInfo(str(meta.get("exchangeTimezoneName") or "UTC"))
+            except (ZoneInfoNotFoundError, ValueError):
+                exchange_tz = timezone.utc
+            quote_date = datetime.fromtimestamp(market_time, tz=exchange_tz).date()
+            last_date = rows[-1]["timestamp"].astimezone(exchange_tz).date()
+            # If Yahoo already includes the current/last session candle, the row
+            # before it is the true previous close. Otherwise the last row is.
+            candidate = rows[-2]["close"] if last_date == quote_date else rows[-1]["close"]
+            candidate = float(candidate)
+            if isfinite(candidate) and candidate > 0:
+                return candidate
+        except (OSError, OverflowError, TypeError, ValueError, KeyError):
+            pass
+
+        candidate = float(rows[-2]["close"])
+        if isfinite(candidate) and candidate > 0:
+            return candidate
+
+    # With insufficient daily rows, prefer Yahoo's actual previousClose. The
+    # range-level chartPreviousClose is a last-resort fallback only.
+    for raw in (meta.get("previousClose"), meta.get("chartPreviousClose")):
+        try:
+            candidate = float(raw)
+            if isfinite(candidate) and candidate > 0:
+                return candidate
+        except (TypeError, ValueError):
+            continue
+    return price
 
 
 def _normalize_history_df(df: pd.DataFrame, symbol: str) -> list[Bar]:
@@ -142,12 +185,11 @@ class YFinanceMarketDataProvider:
                 if not rows:
                     return None
                 last = rows[-1]
-                prev = rows[-2] if len(rows) > 1 else last
                 price = last["close"]
-                prev_close = prev["close"]
+                meta = result.get("meta") or {}
+                prev_close = previous_session_close(rows, meta, price)
                 change = price - prev_close
                 pct = (change / prev_close * 100) if prev_close else 0
-                meta = result.get("meta") or {}
                 row = find_universe(sym) or {}
                 volume = float(meta.get("regularMarketVolume") or last["volume"])
                 mcap = meta.get("marketCap")
@@ -212,11 +254,7 @@ class YFinanceMarketDataProvider:
             if price is None:
                 raise ProviderUnavailable(self.name, f"No quote for {symbol}")
             price = float(price)
-            prev = float(
-                meta.get("chartPreviousClose")
-                or meta.get("previousClose")
-                or (rows[-2]["close"] if len(rows) > 1 else price)
-            )
+            prev = previous_session_close(rows, meta, price)
             change = price - prev
             pct = (change / prev * 100) if prev else 0
             day_high = float(meta.get("regularMarketDayHigh") or (rows[-1]["high"] if rows else price))

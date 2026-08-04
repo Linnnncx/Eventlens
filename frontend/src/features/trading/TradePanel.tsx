@@ -58,6 +58,12 @@ export function TradePanel({ symbol, side, newsId, onSuccess }: TradePanelProps)
   });
 
   useEffect(() => {
+    if (!submitMut.isSuccess) return;
+    const timer = window.setTimeout(() => submitMut.reset(), 2_000);
+    return () => window.clearTimeout(timer);
+  }, [submitMut.isSuccess]);
+
+  useEffect(() => {
     setQuantity('');
     setNotional('');
     setLimitPrice('');
@@ -208,7 +214,7 @@ export function TradePanel({ symbol, side, newsId, onSuccess }: TradePanelProps)
 
         {submitMut.isSuccess && (
           <p className="flex items-center gap-1 text-xs text-up">
-            <CheckCircle2 className="h-3.5 w-3.5" /> Order simulated successfully
+            <CheckCircle2 className="h-3.5 w-3.5" /> 成功下单
           </p>
         )}
       </div>

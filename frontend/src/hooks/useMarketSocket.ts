@@ -11,6 +11,14 @@ const QUOTE_FLUSH_MS = 200;
 export interface LiveQuote {
   symbol: string;
   price: number;
+  previousClose: number;
+  change: number;
+  changePercent: number;
+  dayHigh: number;
+  dayLow: number;
+  volume: number;
+  marketState: string;
+  delayed: boolean;
   timestamp: string;
   provider: string;
 }
@@ -112,6 +120,14 @@ export function useMarketSocket(symbols: string[]) {
             queueQuote({
               symbol: msg.symbol,
               price: msg.price,
+              previousClose: msg.previousClose,
+              change: msg.change,
+              changePercent: msg.changePercent,
+              dayHigh: msg.dayHigh,
+              dayLow: msg.dayLow,
+              volume: msg.volume,
+              marketState: msg.marketState,
+              delayed: msg.delayed,
               timestamp: msg.timestamp,
               provider: msg.provider,
             });

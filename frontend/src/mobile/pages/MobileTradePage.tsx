@@ -8,6 +8,7 @@ import {
   fetchPortfolio,
   fetchQuote,
   fetchTrades,
+  modifyOrder,
   searchSymbols,
 } from '../../api/endpoints';
 import type { Position } from '../../types/api';
@@ -25,6 +26,7 @@ const TABS: { id: TradeTab; label: string }[] = [
 
 const STATUS_LABEL: Record<string, string> = {
   filled: '已成交',
+  open: '待成交',
   pending: '待成交',
   rejected: '已拒绝',
   canceled: '已撤单',
@@ -53,6 +55,9 @@ export function MobileTradePage() {
   const [symbolInput, setSymbolInput] = useState('');
   const [symbol, setSymbol] = useState('');
   const [composing, setComposing] = useState(false);
+  const [editingOrderId, setEditingOrderId] = useState<string | null>(null);
+  const [editOrderQuantity, setEditOrderQuantity] = useState('');
+  const [editOrderPrice, setEditOrderPrice] = useState('');
   const composingRef = useRef(false);
 
   const { data: portfolio, isLoading } = useQuery({
@@ -93,6 +98,16 @@ export function MobileTradePage() {
   const cancel = useMutation({
     mutationFn: (id: string) => cancelOrder(id),
     onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['orders'] });
+      queryClient.invalidateQueries({ queryKey: ['portfolio'] });
+    },
+  });
+
+  const modify = useMutation({
+    mutationFn: ({ id, quantity, limitPrice }: { id: string; quantity: number; limitPrice: number }) =>
+      modifyOrder(id, { quantity, limitPrice }),
+    onSuccess: () => {
+      setEditingOrderId(null);
       queryClient.invalidateQueries({ queryKey: ['orders'] });
       queryClient.invalidateQueries({ queryKey: ['portfolio'] });
     },
@@ -304,15 +319,80 @@ export function MobileTradePage() {
                   </span>
                   <span>{formatMarketTime(o.createdAt, 'MM-dd HH:mm', false)}</span>
                 </div>
-                {o.status === 'pending' && (
-                  <button
-                    type="button"
-                    onClick={() => cancel.mutate(o.id)}
-                    disabled={cancel.isPending}
-                    className="m-tap mt-2 w-full rounded-lg border border-border py-2 text-[13px] text-muted"
-                  >
-                    撤单
-                  </button>
+                {(o.status === 'open' || o.status === 'pending') && (
+                  <>
+                    <div className="mt-2 grid grid-cols-2 gap-2">
+                      <button
+                        type="button"
+                        onClick={() => {
+                          const opening = editingOrderId !== o.id;
+                          setEditingOrderId(opening ? o.id : null);
+                          setEditOrderQuantity(String(o.quantity));
+                          setEditOrderPrice(String(o.limitPrice ?? ''));
+                        }}
+                        className="m-tap rounded-lg border border-primary/40 py-2 text-[13px] text-primary"
+                      >
+                        改单
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => cancel.mutate(o.id)}
+                        disabled={cancel.isPending && cancel.variables === o.id}
+                        className="m-tap rounded-lg border border-down/40 py-2 text-[13px] text-down disabled:opacity-50"
+                      >
+                        撤单
+                      </button>
+                    </div>
+                    {editingOrderId === o.id ? (
+                      <div className="mt-2 space-y-2 rounded-lg border border-primary/25 bg-primary/[0.04] p-2.5">
+                        <div className="grid grid-cols-2 gap-2">
+                          <label className="text-[11px] text-muted">
+                            数量
+                            <input
+                              type="number"
+                              min="0.0001"
+                              step="any"
+                              value={editOrderQuantity}
+                              onChange={(event) => setEditOrderQuantity(event.target.value)}
+                              className="mt-1 w-full rounded-lg border border-border bg-surface px-2.5 py-2 text-[14px] text-gray-100 outline-none focus:border-primary"
+                            />
+                          </label>
+                          <label className="text-[11px] text-muted">
+                            限价
+                            <input
+                              type="number"
+                              min="0.01"
+                              step="0.01"
+                              value={editOrderPrice}
+                              onChange={(event) => setEditOrderPrice(event.target.value)}
+                              className="mt-1 w-full rounded-lg border border-border bg-surface px-2.5 py-2 text-[14px] text-gray-100 outline-none focus:border-primary"
+                            />
+                          </label>
+                        </div>
+                        <button
+                          type="button"
+                          disabled={
+                            modify.isPending ||
+                            Number(editOrderQuantity) <= 0 ||
+                            Number(editOrderPrice) <= 0
+                          }
+                          onClick={() =>
+                            modify.mutate({
+                              id: o.id,
+                              quantity: Number(editOrderQuantity),
+                              limitPrice: Number(editOrderPrice),
+                            })
+                          }
+                          className="btn-primary m-tap w-full py-2.5 text-[13px] disabled:opacity-50"
+                        >
+                          {modify.isPending ? '保存中…' : '确认改单'}
+                        </button>
+                        {modify.isError ? (
+                          <p className="text-[11px] text-down">改单失败，请检查数量、限价或可用资金</p>
+                        ) : null}
+                      </div>
+                    ) : null}
+                  </>
                 )}
               </div>
             ))

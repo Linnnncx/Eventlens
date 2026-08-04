@@ -4,9 +4,15 @@ interface PriceFlashProps {
   value: number;
   formatter?: (v: number) => string;
   className?: string;
+  emphasis?: 'normal' | 'strong';
 }
 
-export function PriceFlash({ value, formatter = (v) => v.toFixed(2), className = '' }: PriceFlashProps) {
+export function PriceFlash({
+  value,
+  formatter = (v) => v.toFixed(2),
+  className = '',
+  emphasis = 'normal',
+}: PriceFlashProps) {
   const prevRef = useRef(value);
   const [flash, setFlash] = useState<'up' | 'down' | null>(null);
 
@@ -22,11 +28,18 @@ export function PriceFlash({ value, formatter = (v) => v.toFixed(2), className =
     }
   }, [value]);
 
-  const flashClass =
-    flash === 'up' ? 'bg-up/20' : flash === 'down' ? 'bg-down/20' : '';
+  const flashClass = flash === 'up'
+    ? emphasis === 'strong'
+      ? 'bg-up/35 text-up ring-1 ring-inset ring-up/60 shadow-[0_0_12px_rgba(34,197,94,0.28)]'
+      : 'bg-up/20'
+    : flash === 'down'
+      ? emphasis === 'strong'
+        ? 'bg-down/35 text-down ring-1 ring-inset ring-down/60 shadow-[0_0_12px_rgba(239,68,68,0.28)]'
+        : 'bg-down/20'
+      : '';
 
   return (
-    <span className={`tabular inline-block rounded px-0.5 transition-colors duration-300 ${flashClass} ${className}`}>
+    <span className={`tabular inline-block rounded px-0.5 transition-all duration-300 ${flashClass} ${className}`}>
       {formatter(value)}
     </span>
   );

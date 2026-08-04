@@ -52,6 +52,12 @@ class Settings(BaseSettings):
     news_scheduler_concurrency: int = 2
     news_scheduler_symbols: str = ""
 
+    # Production daily-bar prewarmer. It fills SQLite with real Yahoo candles so
+    # the first mobile visit to an arbitrary universe symbol is DB-fast.
+    market_scheduler_interval_seconds: int = 21600
+    market_scheduler_concurrency: int = 4
+    market_scheduler_max_symbols: int = 500
+
     alpaca_api_key: str = ""
     alpaca_api_secret: str = ""
     alpaca_feed: str = "iex"

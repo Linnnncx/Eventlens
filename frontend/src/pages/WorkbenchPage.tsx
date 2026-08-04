@@ -242,15 +242,16 @@ export function WorkbenchPage() {
   }, [portfolio, setPortfolio]);
 
   const watchSymbols = watchlist?.items ?? [];
+  const [sideLiveSymbols, setSideLiveSymbols] = useState<string[]>([]);
   const heldSymbols = useMemo(
     () => new Set((portfolio?.positions ?? []).map((item) => item.symbol)),
     [portfolio],
   );
   const socketSymbols = useMemo(() => {
     // Cap subscriptions — each quote used to re-render the whole workbench.
-    const all = [...new Set([symbol, ...watchSymbols, ...recentSymbols])];
-    return all.slice(0, 12);
-  }, [symbol, watchSymbols, recentSymbols]);
+    const all = [...new Set([symbol, ...sideLiveSymbols, ...watchSymbols, ...recentSymbols])];
+    return all.slice(0, 20);
+  }, [symbol, sideLiveSymbols, watchSymbols, recentSymbols]);
 
   const handleVisibleRangeChange = useCallback((range: LogicalRange | null) => {
     setChartVisibleRange((prev) => {
@@ -264,8 +265,9 @@ export function WorkbenchPage() {
   }, []);
   const { quotes } = useMarketSocket(socketSymbols);
 
-  const livePrice = quotes[symbol]?.price ?? quoteData?.quote.price ?? 0;
-  const changePct = quoteData?.quote.changePercent ?? 0;
+  const liveQuote = quotes[symbol];
+  const livePrice = liveQuote?.price ?? quoteData?.quote.price ?? 0;
+  const changePct = liveQuote?.changePercent ?? quoteData?.quote.changePercent ?? 0;
   const position = getPosition(symbol);
 
   const handleBarHover = useCallback(
@@ -482,7 +484,7 @@ export function WorkbenchPage() {
                 <span className="text-sm text-down">报价加载失败</span>
               ) : (
                 <>
-                  <PriceFlash value={livePrice} className="text-xl font-semibold tabular md:text-2xl" />
+                  <PriceFlash value={livePrice} emphasis="strong" className="text-xl font-semibold tabular md:text-2xl" />
                   <span className={`text-base tabular ${changeColorClass(changePct)}`}>
                     {formatPercent(changePct)}
                   </span>
@@ -491,11 +493,11 @@ export function WorkbenchPage() {
             </div>
             {quote && (
               <div className="mt-1 flex flex-wrap gap-x-3.5 gap-y-0.5 text-xs text-muted tabular md:text-sm">
-                <span>昨收 {quote.previousClose.toFixed(2)}</span>
-                <span className="text-up">高 {quote.dayHigh.toFixed(2)}</span>
-                <span className="text-down">低 {quote.dayLow.toFixed(2)}</span>
-                <span>量 {formatCompact(quote.volume)}</span>
-                <span>{quote.provider}{quote.delayed ? ' · delayed' : ''}</span>
+                <span>昨收 {(liveQuote?.previousClose ?? quote.previousClose).toFixed(2)}</span>
+                <span className="text-up">高 {(liveQuote?.dayHigh ?? quote.dayHigh).toFixed(2)}</span>
+                <span className="text-down">低 {(liveQuote?.dayLow ?? quote.dayLow).toFixed(2)}</span>
+                <span>量 {formatCompact(liveQuote?.volume ?? quote.volume)}</span>
+                <span>{liveQuote?.provider ?? quote.provider}{(liveQuote?.delayed ?? quote.delayed) ? ' · delayed' : ''}</span>
               </div>
             )}
           </div>
@@ -556,6 +558,8 @@ export function WorkbenchPage() {
               current={symbol}
               watchSymbols={watchSymbols}
               heldSymbols={heldSymbols}
+              liveQuotes={quotes}
+              onLiveSymbolsChange={setSideLiveSymbols}
               onSelect={switchSymbol}
               onPrefetch={prefetchSymbol}
             />
@@ -597,6 +601,7 @@ export function WorkbenchPage() {
                 <ErrorBoundary>
                   <ChartPanel
                     bars={barsData?.bars ?? EMPTY_BARS}
+                    livePrice={livePrice}
                     newsItems={indexMode ? EMPTY_NEWS : (eventsData?.items ?? EMPTY_NEWS)}
                     timeframe={timeframe}
                     selectedEventId={selectedEventId}

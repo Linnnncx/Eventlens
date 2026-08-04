@@ -14,7 +14,6 @@ from app.database.session import (
     NewsAnalysisRow,
     NewsContentRow,
     NewsEventRow,
-    OrderRow,
     WatchlistRow,
     get_db,
     init_db,
@@ -24,6 +23,7 @@ from app.providers.market.fixture_provider import load_universe, universe_profil
 from app.schemas.market import (
     BarsResponse,
     NewsResponse,
+    OrderModifyRequest,
     OrderBookResponse,
     OrderPreviewRequest,
     ProviderMeta,
@@ -41,11 +41,13 @@ from app.services.market_hub import get_shared_quote
 from app.services.market_store import load_bars, save_bars, save_snapshots
 from app.services.trading import (
     build_portfolio_state,
+    cancel_open_order,
     closed_position_rankings,
     ensure_portfolio,
     ensure_positions_watchlisted,
     list_orders,
     list_trades,
+    modify_open_order,
     preview_order,
     reset_demo,
     simulate_order,
@@ -231,7 +233,9 @@ async def market_screener(equities_only: bool = True):
 @router.get("/market/quote/{symbol}")
 async def market_quote(symbol: str):
     symbol = symbol.upper()
-    q, provider, cached = await get_shared_quote(symbol, max_age=5.0)
+    # A stale persisted quote can carry an obsolete previous-close baseline and
+    # must never overwrite the live percentage shown by snapshots/WebSocket.
+    q, provider, cached = await get_shared_quote(symbol, max_age=5.0, allow_stale=False)
     return QuoteResponse(
         quote=q,
         meta=_meta(provider, cached=cached, fixture=provider == "fixture"),
@@ -616,14 +620,26 @@ async def orders_simulate(req: OrderPreviewRequest, db: Session = Depends(get_db
 
 @router.delete("/orders/{order_id}")
 async def cancel_order(order_id: str, db: Session = Depends(get_db)):
-    row = db.query(OrderRow).filter(OrderRow.id == order_id).first()
-    if not row:
-        raise HTTPException(404, "Order not found")
-    if row.status != "open":
-        raise HTTPException(400, "Only open orders can be canceled")
-    row.status = "canceled"
-    db.commit()
-    return {"ok": True}
+    try:
+        return {"ok": True, "order": cancel_open_order(db, order_id)}
+    except LookupError as exc:
+        raise HTTPException(404, str(exc)) from exc
+    except ValueError as exc:
+        raise HTTPException(400, str(exc)) from exc
+
+
+@router.patch("/orders/{order_id}")
+async def modify_order(
+    order_id: str,
+    req: OrderModifyRequest,
+    db: Session = Depends(get_db),
+):
+    try:
+        return {"ok": True, "order": await modify_open_order(db, order_id, req)}
+    except LookupError as exc:
+        raise HTTPException(404, str(exc)) from exc
+    except ValueError as exc:
+        raise HTTPException(400, str(exc)) from exc
 
 
 @router.post("/demo/reset")

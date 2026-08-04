@@ -87,7 +87,7 @@ export function MarketPage() {
   const snapMap = new Map(snapshots?.snapshots.map((s) => [s.symbol, s]) ?? []);
 
   const getPrice = (sym: string) => quotes[sym]?.price ?? snapMap.get(sym)?.price ?? 0;
-  const getChange = (sym: string) => snapMap.get(sym)?.changePercent ?? 0;
+  const getChange = (sym: string) => quotes[sym]?.changePercent ?? snapMap.get(sym)?.changePercent ?? 0;
 
   const heatCells = heatPool
     .map((sym) => {
@@ -95,7 +95,7 @@ export function MarketPage() {
       return {
         symbol: sym,
         name: snap?.name ?? sym,
-        changePercent: snap?.changePercent ?? 0,
+        changePercent: getChange(sym),
         price: getPrice(sym),
       };
     })

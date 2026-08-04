@@ -4,6 +4,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Search, X } from 'lucide-react';
 import {
   addToWatchlist,
+  fetchBars,
   fetchMarketStatus,
   fetchPortfolio,
   fetchScreener,
@@ -13,6 +14,8 @@ import {
 } from '../../api/endpoints';
 import { INDEX_STRIP } from '../../features/market/indices';
 import type { Snapshot } from '../../types/api';
+import { PriceFlash } from '../../components/PriceFlash';
+import { useMarketSocket, type LiveQuote } from '../../hooks/useMarketSocket';
 import {
   changeColorClass,
   formatCompact,
@@ -57,7 +60,12 @@ function QuoteRow({ snapshot }: { snapshot: Snapshot }) {
         <div className="truncate text-[11px] leading-tight text-muted">{snapshot.name}</div>
       </div>
       <div className="tabular text-right">
-        <div className="text-[14px] font-medium text-gray-100">{formatPrice(snapshot.price)}</div>
+        <PriceFlash
+          value={snapshot.price}
+          formatter={formatPrice}
+          emphasis="strong"
+          className="text-[14px] font-medium text-gray-100"
+        />
         <div className="text-[10px] text-muted">{formatCompact(snapshot.volume)}</div>
       </div>
       <div
@@ -69,6 +77,28 @@ function QuoteRow({ snapshot }: { snapshot: Snapshot }) {
       </div>
     </Link>
   );
+}
+
+function mergeLiveSnapshot(snapshot: Snapshot, live?: LiveQuote): Snapshot {
+  if (!live || !Number.isFinite(live.price) || live.price <= 0) return snapshot;
+  const previousClose = live.previousClose || snapshot.previousClose || snapshot.price || live.price;
+  const change = Number.isFinite(live.change) ? live.change : live.price - previousClose;
+  return {
+    ...snapshot,
+    price: live.price,
+    previousClose,
+    change,
+    changePercent: Number.isFinite(live.changePercent)
+      ? live.changePercent
+      : previousClose
+        ? (change / previousClose) * 100
+        : 0,
+    dayHigh: live.dayHigh,
+    dayLow: live.dayLow,
+    volume: live.volume,
+    provider: live.provider,
+    timestamp: live.timestamp,
+  };
 }
 
 export function MobileMarketPage() {
@@ -165,6 +195,53 @@ export function MobileMarketPage() {
       .slice(0, 80);
   }, [screener, sort, sortAsc, indexFilter]);
 
+  const liveSymbols = useMemo(() => {
+    const rows = tab === 'watchlist' ? watchSymbols : marketRows.map((row) => row.symbol);
+    return [...new Set([...indexSymbols, ...rows])].slice(0, 20);
+  }, [tab, watchSymbols, marketRows, indexSymbols]);
+  const { quotes } = useMarketSocket(liveSymbols);
+  const liveSnapMap = useMemo(
+    () => new Map([...snapMap].map(([symbol, snapshot]) => [symbol, mergeLiveSnapshot(snapshot, quotes[symbol])])),
+    [snapMap, quotes],
+  );
+  const liveMarketRows = useMemo(
+    () => marketRows.map((snapshot) => mergeLiveSnapshot(snapshot, quotes[snapshot.symbol])),
+    [marketRows, quotes],
+  );
+
+  const warmSymbols = useMemo(() => {
+    const visible = tab === 'watchlist' ? watchSymbols : marketRows.map((row) => row.symbol);
+    const searched = searchResults?.items?.map((item) => item.symbol) ?? [];
+    return [...new Set([...searched.slice(0, 2), ...visible])].slice(0, 8);
+  }, [tab, watchSymbols, marketRows, searchResults]);
+  const warmSymbolsKey = warmSymbols.join(',');
+
+  useEffect(() => {
+    if (!warmSymbolsKey) return;
+    let canceled = false;
+    const timer = window.setTimeout(() => {
+      void (async () => {
+        for (let i = 0; i < warmSymbols.length && !canceled; i += 2) {
+          const batch = warmSymbols.slice(i, i + 2);
+          await Promise.all(
+            batch.map((warmSymbol) =>
+              queryClient.prefetchQuery({
+                queryKey: ['bars', warmSymbol, '1Day'],
+                queryFn: ({ signal }) =>
+                  fetchBars(warmSymbol, '1Day', { limit: 300, signal }),
+                staleTime: 5 * 60_000,
+              }),
+            ),
+          );
+        }
+      })();
+    }, 600);
+    return () => {
+      canceled = true;
+      window.clearTimeout(timer);
+    };
+  }, [warmSymbolsKey, queryClient]);
+
   const onSortChip = (id: string) => {
     if (sort === id) setSortAsc((v) => !v);
     else {
@@ -229,7 +306,7 @@ export function MobileMarketPage() {
 
       <ScrollRow className="px-3 py-3">
         {INDEX_STRIP.map((idx) => {
-          const snap = snapMap.get(idx.symbol);
+          const snap = liveSnapMap.get(idx.symbol);
           return (
             <Link
               key={idx.symbol}
@@ -305,20 +382,20 @@ export function MobileMarketPage() {
           ) : (
             <MobileWatchlist
               symbols={watchSymbols}
-              snapMap={snapMap}
+              snapMap={liveSnapMap}
               heldSymbols={heldSymbols}
             />
           )
-        ) : screenerLoading && marketRows.length === 0 ? (
+        ) : screenerLoading && liveMarketRows.length === 0 ? (
           <div className="space-y-2 p-3">
             {Array.from({ length: 6 }).map((_, i) => (
               <Skeleton key={i} className="h-12 w-full" />
             ))}
           </div>
-        ) : marketRows.length === 0 ? (
+        ) : liveMarketRows.length === 0 ? (
           <EmptyState text="暂无数据" />
         ) : (
-          marketRows.map((row) => <QuoteRow key={row.symbol} snapshot={row} />)
+          liveMarketRows.map((row) => <QuoteRow key={row.symbol} snapshot={row} />)
         )}
       </div>
     </div>

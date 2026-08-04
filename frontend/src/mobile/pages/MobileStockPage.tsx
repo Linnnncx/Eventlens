@@ -52,6 +52,8 @@ import {
 import { newsWindowForTimeframe } from '../../utils/eventAlign';
 import { isIndexSymbol } from '../../features/market/indices';
 import { useIsLandscape } from '../../hooks/useIsMobile';
+import { useMarketSocket } from '../../hooks/useMarketSocket';
+import { PriceFlash } from '../../components/PriceFlash';
 import {
   MobileChart,
   newsByBarMap,
@@ -87,6 +89,13 @@ const TABS: { id: StockTab; label: string }[] = [
 const EMPTY_BARS: Bar[] = [];
 const EMPTY_NEWS: NewsItem[] = [];
 const NEWS_ANCHORS_KEY = 'eventlens.mobile.news-anchors';
+
+function mobileBarsRefreshInterval(timeframe: Timeframe): number {
+  if (timeframe === '1Min') return 30_000;
+  if (timeframe === '5Min' || timeframe === '15Min') return 60_000;
+  if (timeframe === '1Hour' || timeframe === '4Hour') return 5 * 60_000;
+  return 5 * 60_000;
+}
 
 function loadShowNewsAnchors(): boolean {
   try {
@@ -175,17 +184,19 @@ export function MobileStockPage() {
     queryFn: ({ signal }) => fetchBars(symbol, timeframe, { limit: 300, signal }),
     enabled: Boolean(symbol),
     staleTime: 30_000,
+    refetchInterval: mobileBarsRefreshInterval(timeframe),
   });
 
   const indexMode = isIndexSymbol(symbol);
   const newsWindow = useMemo(() => newsWindowForTimeframe(timeframe), [timeframe]);
   // Same events feed as desktop — windowed by timeframe so older candles still get news.
-  const { data: eventsData } = useQuery({
+  const { data: eventsData, isLoading: newsLoading } = useQuery({
     queryKey: ['events', symbol, timeframe, newsWindow.start, newsWindow.limit],
     queryFn: ({ signal }) =>
       fetchEvents(symbol, timeframe, { start: newsWindow.start, limit: newsWindow.limit, signal }),
-    // Let quote + chart render first; the large news/anchor payload is secondary.
-    enabled: Boolean(symbol) && !indexMode && Boolean(barsData),
+    // Start in parallel with bars. The backend returns a small recent cold-start
+    // window first and backfills older chart news asynchronously.
+    enabled: Boolean(symbol) && !indexMode,
     staleTime: 60_000,
     refetchInterval: 60_000,
     retry: 2,
@@ -214,6 +225,9 @@ export function MobileStockPage() {
 
   const bars = barsData?.bars ?? EMPTY_BARS;
   const quote = quoteData?.quote;
+  const { quotes: liveQuotes } = useMarketSocket(symbol ? [symbol] : []);
+  const liveQuote = liveQuotes[symbol];
+  const livePrice = liveQuote?.price ?? quote?.price ?? bars[bars.length - 1]?.close ?? 0;
   const position = portfolio?.positions.find((p) => p.symbol === symbol);
   // Use the timeframe-aligned events payload (not a short recent /news list).
   const allNews = useMemo(
@@ -303,10 +317,17 @@ export function MobileStockPage() {
     if (!next.includes(activeSub) && next[0]) setActiveSub(next[0]);
   };
 
-  const price = quote?.price ?? bars[bars.length - 1]?.close ?? 0;
-  const change = quote?.change ?? 0;
-  const changePercent = quote?.changePercent ?? 0;
-  const displayBar = hovered?.bar ?? bars[bars.length - 1];
+  const price = livePrice;
+  const previousClose = liveQuote?.previousClose ?? quote?.previousClose ?? 0;
+  const change = liveQuote?.change ?? (previousClose > 0 ? price - previousClose : (quote?.change ?? 0));
+  const changePercent = liveQuote?.changePercent
+    ?? (previousClose > 0 ? (change / previousClose) * 100 : (quote?.changePercent ?? 0));
+  const lastBar = bars[bars.length - 1];
+  const displayBar = hovered?.bar ?? (
+    lastBar && price > 0
+      ? { ...lastBar, high: Math.max(lastBar.high, price), low: Math.min(lastBar.low, price), close: price }
+      : lastBar
+  );
   const immersive = landscape || chartFull;
 
   const chartBlock = (
@@ -341,10 +362,13 @@ export function MobileStockPage() {
       )}
 
       {barsLoading && bars.length === 0 ? (
-        <Skeleton className="mx-3 mb-3" />
+        <div className="mx-3 mb-3" style={{ height: chartHeight }}>
+          <Skeleton className="h-full w-full" />
+        </div>
       ) : (
         <MobileChart
           bars={bars}
+          livePrice={livePrice}
           symbol={symbol}
           timeframe={timeframe}
           height={chartHeight}
@@ -481,9 +505,12 @@ export function MobileStockPage() {
             <ArrowLeft className="h-5 w-5" />
           </button>
           <span className="font-mono text-[15px] font-semibold text-gray-100">{symbol}</span>
-          <span className={`tabular text-[15px] font-semibold ${changeColorClass(change)}`}>
-            {formatPrice(price)}
-          </span>
+          <PriceFlash
+            value={price}
+            formatter={formatPrice}
+            emphasis="strong"
+            className={`text-[15px] font-semibold ${changeColorClass(change)}`}
+          />
           <span className={`tabular text-[12px] ${changeColorClass(change)}`}>
             {formatPercent(changePercent)}
           </span>
@@ -546,19 +573,22 @@ export function MobileStockPage() {
 
       <section className="px-4 pb-3 pt-3">
         <div className="flex items-end gap-2">
-          <span className={`tabular text-[32px] font-bold leading-none ${changeColorClass(change)}`}>
-            {formatPrice(price)}
-          </span>
+          <PriceFlash
+            value={price}
+            formatter={formatPrice}
+            emphasis="strong"
+            className={`text-[32px] font-bold leading-none ${changeColorClass(change)}`}
+          />
           <span className={`tabular pb-0.5 text-[14px] font-medium ${changeColorClass(change)}`}>
             {change >= 0 ? '+' : ''}
             {formatPrice(change)} {formatPercent(changePercent)}
           </span>
         </div>
         <div className="tabular mt-2 grid grid-cols-4 gap-y-1 text-[11px] text-muted">
-          <span>昨收 {quote ? formatPrice(quote.previousClose) : '—'}</span>
-          <span>最高 {quote ? formatPrice(quote.dayHigh) : '—'}</span>
-          <span>最低 {quote ? formatPrice(quote.dayLow) : '—'}</span>
-          <span>量 {quote ? formatCompact(quote.volume ?? 0) : '—'}</span>
+          <span>昨收 {previousClose > 0 ? formatPrice(previousClose) : '—'}</span>
+          <span>最高 {liveQuote || quote ? formatPrice(liveQuote?.dayHigh ?? quote?.dayHigh ?? 0) : '—'}</span>
+          <span>最低 {liveQuote || quote ? formatPrice(liveQuote?.dayLow ?? quote?.dayLow ?? 0) : '—'}</span>
+          <span>量 {liveQuote || quote ? formatCompact(liveQuote?.volume ?? quote?.volume ?? 0) : '—'}</span>
         </div>
       </section>
 
@@ -593,7 +623,13 @@ export function MobileStockPage() {
               </div>
             )}
 
-            {listNews.length === 0 ? (
+            {newsLoading && listNews.length === 0 ? (
+              <div className="space-y-2">
+                {Array.from({ length: 4 }).map((_, index) => (
+                  <Skeleton key={index} className="h-24 w-full" />
+                ))}
+              </div>
+            ) : listNews.length === 0 ? (
               <EmptyState
                 text={
                   selectedBarTime != null

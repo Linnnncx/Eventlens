@@ -52,6 +52,8 @@ interface OverlayLine {
 
 interface MobileChartProps {
   bars: Bar[];
+  /** Shared live quote for the rendered current candle. */
+  livePrice?: number;
   symbol: string;
   timeframe: Timeframe | string;
   height: number;
@@ -234,6 +236,7 @@ function buildOverlays(
 
 export function MobileChart({
   bars,
+  livePrice,
   symbol,
   timeframe,
   height,
@@ -759,6 +762,21 @@ export function MobileChart({
       onVisibleRangeRef.current?.(chartRef.current?.timeScale().getVisibleLogicalRange() ?? null);
     }
   }, [bars, symbol, timeframe]);
+
+  // Keep the visible last-value label current without rewriting the source bar
+  // array used by anchors, indicators, selections and crosshair calculations.
+  useEffect(() => {
+    const candles = candleRef.current;
+    const last = bars[bars.length - 1];
+    if (!candles || !last || livePrice == null || !Number.isFinite(livePrice) || livePrice <= 0) return;
+    candles.update({
+      time: sec(last.timestamp),
+      open: last.open,
+      high: Math.max(last.high, livePrice),
+      low: Math.min(last.low, livePrice),
+      close: livePrice,
+    });
+  }, [bars, livePrice]);
 
   useEffect(() => {
     const chart = chartRef.current;

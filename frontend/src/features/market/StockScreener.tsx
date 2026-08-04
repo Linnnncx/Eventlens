@@ -2,6 +2,8 @@ import { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { Search } from 'lucide-react';
 import { fetchScreener, searchSymbols } from '../../api/endpoints';
+import { PriceFlash } from '../../components/PriceFlash';
+import type { LiveQuote } from '../../hooks/useMarketSocket';
 import type { Snapshot } from '../../types/api';
 import { changeColorClass, formatCompact, formatPercent, formatPrice } from '../../utils/format';
 
@@ -131,9 +133,16 @@ const ScreenerRow = memo(function ScreenerRow({
         <div className="truncate text-xs text-muted">{row.name}</div>
       </div>
       <div className="shrink-0 text-right tabular">
-        <div className="text-sm font-medium leading-tight">
-          {hasQuote ? formatPrice(row.price) : '—'}
-        </div>
+        {hasQuote ? (
+          <PriceFlash
+            value={row.price}
+            formatter={formatPrice}
+            emphasis="strong"
+            className="text-sm font-medium leading-tight"
+          />
+        ) : (
+          <div className="text-sm font-medium leading-tight">—</div>
+        )}
         <div className={`text-xs ${hasQuote ? changeColorClass(row.changePercent) : 'text-muted'}`}>
           {hasQuote ? formatPercent(row.changePercent) : '—'}
         </div>
@@ -154,12 +163,16 @@ export function StockScreener({
   current,
   watchSymbols = [],
   heldSymbols,
+  liveQuotes = {},
+  onLiveSymbolsChange,
   onSelect,
   onPrefetch,
 }: {
   current: string;
   watchSymbols?: string[];
   heldSymbols?: Set<string>;
+  liveQuotes?: Record<string, LiveQuote>;
+  onLiveSymbolsChange?: (symbols: string[]) => void;
   onSelect: (symbol: string) => void;
   onPrefetch?: (symbol: string) => void;
 }) {
@@ -172,6 +185,8 @@ export function StockScreener({
   const [searchOpen, setSearchOpen] = useState(false);
   const searchWrapRef = useRef<HTMLDivElement>(null);
   const prefetchTimerRef = useRef<number | null>(null);
+  const liveWindowTimerRef = useRef<number | null>(null);
+  const [liveWindowStart, setLiveWindowStart] = useState(0);
 
   const schedulePrefetch = useCallback((symbol: string) => {
     if (prefetchTimerRef.current != null) window.clearTimeout(prefetchTimerRef.current);
@@ -189,6 +204,14 @@ export function StockScreener({
     const t = setTimeout(() => setDebounced(query.trim()), 250);
     return () => clearTimeout(t);
   }, [query]);
+
+  useEffect(() => {
+    setLiveWindowStart(0);
+  }, [tab, sector, query, sortKey, sortAsc]);
+
+  useEffect(() => () => {
+    if (liveWindowTimerRef.current != null) window.clearTimeout(liveWindowTimerRef.current);
+  }, []);
 
   useEffect(() => {
     const onDoc = (e: MouseEvent) => {
@@ -271,6 +294,47 @@ export function StockScreener({
       return ((va as number) - (vb as number)) * dir;
     });
   }, [baseRows, tab, sector, query, sortKey, sortAsc]);
+
+  // Stream the active row plus the first visible rows. All browser clients share
+  // the backend quote cache, so this does not multiply upstream Yahoo requests.
+  const liveSymbols = useMemo(
+    () => [
+      ...new Set([
+        current,
+        ...filtered.slice(liveWindowStart, liveWindowStart + 19).map((row) => row.symbol),
+      ]),
+    ].slice(0, 20),
+    [current, filtered, liveWindowStart],
+  );
+  const liveSymbolsKey = liveSymbols.join(',');
+  useEffect(() => {
+    onLiveSymbolsChange?.(liveSymbols);
+  }, [liveSymbolsKey, onLiveSymbolsChange]);
+  const liveRows = useMemo(
+    () => filtered.map((row) => {
+      const live = liveQuotes[row.symbol];
+      if (!live || !Number.isFinite(live.price) || live.price <= 0) return row;
+      const previousClose = live.previousClose || row.previousClose || row.price || live.price;
+      const change = Number.isFinite(live.change) ? live.change : live.price - previousClose;
+      return {
+        ...row,
+        price: live.price,
+        previousClose,
+        change,
+        changePercent: Number.isFinite(live.changePercent)
+          ? live.changePercent
+          : previousClose
+            ? (change / previousClose) * 100
+            : 0,
+        dayHigh: live.dayHigh,
+        dayLow: live.dayLow,
+        volume: live.volume,
+        provider: live.provider,
+        timestamp: live.timestamp,
+      };
+    }),
+    [filtered, liveQuotes],
+  );
 
   const toggleSort = (key: ScreenerSortKey) => {
     if (key === sortKey) {
@@ -432,7 +496,14 @@ export function StockScreener({
         )}
       </div>
 
-      <div className="min-h-0 flex-1 overflow-y-auto">
+      <div
+        className="min-h-0 flex-1 overflow-y-auto"
+        onScroll={(event) => {
+          const nextStart = Math.max(0, Math.floor(event.currentTarget.scrollTop / 50) - 2);
+          if (liveWindowTimerRef.current != null) window.clearTimeout(liveWindowTimerRef.current);
+          liveWindowTimerRef.current = window.setTimeout(() => setLiveWindowStart(nextStart), 160);
+        }}
+      >
         {tab === 'market' && isError && (
           <p className="px-3 py-4 text-sm text-down">筛选列表加载失败，请确认后端在跑。</p>
         )}
@@ -447,7 +518,7 @@ export function StockScreener({
         {tab === 'watchlist' && watchSymbols.length > 0 && filtered.length === 0 && (
           <p className="px-3 py-4 text-sm text-muted">没有匹配的自选</p>
         )}
-        {filtered.map((row) => (
+        {liveRows.map((row) => (
           <ScreenerRow
             key={row.symbol}
             row={row}

@@ -34,6 +34,11 @@ logger = logging.getLogger(__name__)
 # Treat stored coverage as good enough if it reaches within this much of the request
 COVERAGE_SLACK = timedelta(days=3)
 RECENT_REFRESH_WINDOW = timedelta(days=2)
+# A 1Day chart asks for roughly 470 days of news. Fetching that entire range on
+# a cold mobile request fans out into many RSS calls, so return recent headlines
+# first and backfill the historical window asynchronously.
+COLD_START_WINDOW = timedelta(days=14)
+COLD_START_LIMIT = 120
 
 _locks: dict[str, asyncio.Lock] = {}
 # Hold strong references so background refreshes aren't garbage collected mid-flight
@@ -213,6 +218,18 @@ async def _refresh(symbol: str, start: datetime | None, end: datetime | None, li
             db.close()
 
 
+async def _refresh_after_request(
+    symbol: str,
+    start: datetime | None,
+    end: datetime | None,
+    limit: int,
+) -> None:
+    # The cold-start caller still owns the per-symbol lock when scheduling this
+    # task. Yield once so the request can release it before the historical fetch.
+    await asyncio.sleep(0)
+    await _refresh(symbol, start, end, limit)
+
+
 async def get_news_window(
     db,
     symbol: str,
@@ -263,7 +280,15 @@ async def get_news_window(
         if cached_items:
             return cached_items, "sqlite", True
 
-        items, provider_name = await _fetch_upstream(symbol, start, end, limit)
+        quick_start_floor = now - COLD_START_WINDOW
+        quick_start = max(start, quick_start_floor) if start is not None else quick_start_floor
+        quick_limit = min(limit, COLD_START_LIMIT)
+        items, provider_name = await _fetch_upstream(symbol, quick_start, end, quick_limit)
         if items:
-            save_to_db(db, symbol, items, start, end)
+            save_to_db(db, symbol, items, quick_start, end)
+
+        if start is not None and start < quick_start - COVERAGE_SLACK:
+            task = asyncio.create_task(_refresh_after_request(symbol, start, end, limit))
+            _background_tasks.add(task)
+            task.add_done_callback(_background_tasks.discard)
         return items, provider_name, False

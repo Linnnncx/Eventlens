@@ -1,4 +1,4 @@
-import { apiDelete, apiGet, apiPost, apiPut } from './client';
+import { apiDelete, apiGet, apiPatch, apiPost, apiPut } from './client';
 import type {
   BarsResponse,
   EventsResponse,
@@ -226,7 +226,17 @@ export function simulateOrder(req: OrderPreviewRequest) {
 }
 
 export function cancelOrder(orderId: string) {
-  return apiDelete<{ ok: boolean }>(`/orders/${encodeURIComponent(orderId)}`);
+  return apiDelete<{ ok: boolean; order: Order }>(`/orders/${encodeURIComponent(orderId)}`);
+}
+
+export function modifyOrder(
+  orderId: string,
+  payload: { quantity: number; limitPrice: number },
+) {
+  return apiPatch<{ ok: boolean; order: Order }>(
+    `/orders/${encodeURIComponent(orderId)}`,
+    payload,
+  );
 }
 
 export function resetDemo() {

@@ -7,6 +7,7 @@ from pathlib import Path
 
 from fastapi import FastAPI, WebSocket, WebSocketDisconnect
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.middleware.gzip import GZipMiddleware
 
 from app.api.routes import router
 from app.core.config import get_settings
@@ -86,7 +87,11 @@ async def lifespan(app: FastAPI):
 
                     async def _one(sym: str):
                         try:
-                            quote, _provider, _cached = await get_shared_quote(sym, max_age=5.0)
+                            quote, _provider, _cached = await get_shared_quote(
+                                sym,
+                                max_age=5.0,
+                                allow_stale=False,
+                            )
                             return sym, quote
                         except Exception:
                             return sym, None
@@ -99,6 +104,14 @@ async def lifespan(app: FastAPI):
                             "type": "quote",
                             "symbol": sym,
                             "price": q.price,
+                            "previousClose": q.previous_close,
+                            "change": q.change,
+                            "changePercent": q.change_percent,
+                            "dayHigh": q.day_high,
+                            "dayLow": q.day_low,
+                            "volume": q.volume,
+                            "marketState": q.market_state,
+                            "delayed": q.delayed,
                             "timestamp": q.timestamp.isoformat(),
                             "provider": q.provider,
                         }
@@ -131,6 +144,7 @@ async def lifespan(app: FastAPI):
 def create_app() -> FastAPI:
     settings = get_settings()
     app = FastAPI(title="EventLens API", version="1.0.0", lifespan=lifespan)
+    app.add_middleware(GZipMiddleware, minimum_size=1_000, compresslevel=5)
     app.add_middleware(
         CORSMiddleware,
         allow_origins=[settings.frontend_origin, "http://127.0.0.1:5173", "http://localhost:5173"],
