@@ -261,6 +261,7 @@ export interface OrderPreviewRequest {
   quantity?: number | null;
   notional?: number | null;
   limitPrice?: number | null;
+  referencePrice?: number | null;
   stopLoss?: number | null;
   takeProfit?: number | null;
   extendedHours?: boolean;

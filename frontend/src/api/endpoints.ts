@@ -76,8 +76,8 @@ export function searchSymbols(q: string, limit = 20, signal?: AbortSignal) {
   return apiGet<{ items: SymbolProfile[] }>('/symbols/search', { q, limit }, signal);
 }
 
-export function fetchSymbolProfile(symbol: string) {
-  return apiGet<SymbolProfile>(`/symbols/${encodeURIComponent(symbol)}`);
+export function fetchSymbolProfile(symbol: string, signal?: AbortSignal) {
+  return apiGet<SymbolProfile>(`/symbols/${encodeURIComponent(symbol)}`, undefined, signal);
 }
 
 export function fetchSnapshots(symbols: string[], signal?: AbortSignal) {
@@ -217,8 +217,8 @@ export function fetchTrades() {
   return apiGet<{ items: Trade[] }>('/trades');
 }
 
-export function previewOrder(req: OrderPreviewRequest) {
-  return apiPost<OrderPreviewResponse>('/orders/preview', req);
+export function previewOrder(req: OrderPreviewRequest, signal?: AbortSignal) {
+  return apiPost<OrderPreviewResponse>('/orders/preview', req, signal);
 }
 
 export function simulateOrder(req: OrderPreviewRequest) {

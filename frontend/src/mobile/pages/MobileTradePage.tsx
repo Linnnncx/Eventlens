@@ -78,14 +78,14 @@ export function MobileTradePage() {
   const searchKey = normalizeTickerInput(symbolInput);
   const { data: searchResults } = useQuery({
     queryKey: ['symbol-search', searchKey],
-    queryFn: () => searchSymbols(searchKey, 8),
+    queryFn: ({ signal }) => searchSymbols(searchKey, 8, signal),
     enabled: searchKey.length >= 1 && !symbol && !composing,
     staleTime: 30_000,
   });
 
   const { data: quoteData } = useQuery({
     queryKey: ['quote', symbol],
-    queryFn: () => fetchQuote(symbol),
+    queryFn: ({ signal }) => fetchQuote(symbol, signal),
     enabled: Boolean(symbol),
     refetchInterval: 20_000,
   });

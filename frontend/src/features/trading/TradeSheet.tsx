@@ -6,11 +6,12 @@ import { QuickOrderBox } from './QuickOrderBox';
 interface TradeSheetProps {
   open: boolean;
   symbol: string;
+  price: number;
   newsId?: string | null;
   onClose: () => void;
 }
 
-export function TradeSheet({ open, symbol, newsId, onClose }: TradeSheetProps) {
+export function TradeSheet({ open, symbol, price, newsId, onClose }: TradeSheetProps) {
   useEffect(() => {
     if (open) {
       document.body.style.overflow = 'hidden';
@@ -44,7 +45,7 @@ export function TradeSheet({ open, symbol, newsId, onClose }: TradeSheetProps) {
             <OrderBook symbol={symbol} levels={8} />
           </div>
           <div className="min-h-0 overflow-hidden">
-            <QuickOrderBox inline symbol={symbol} newsId={newsId} onClose={onClose} />
+            <QuickOrderBox inline symbol={symbol} price={price} newsId={newsId} onClose={onClose} />
           </div>
         </div>
       </div>

@@ -83,6 +83,7 @@ function placeholderRow(symbol: string): Snapshot {
 const ScreenerRow = memo(function ScreenerRow({
   row,
   active,
+  held,
   metric,
   onSelect,
   onPrefetch,
@@ -90,6 +91,7 @@ const ScreenerRow = memo(function ScreenerRow({
 }: {
   row: Snapshot;
   active: boolean;
+  held: boolean;
   metric: ScreenerSortKey | null;
   onSelect: (symbol: string) => void;
   onPrefetch: (symbol: string) => void;
@@ -104,12 +106,27 @@ const ScreenerRow = memo(function ScreenerRow({
       onMouseLeave={onCancelPrefetch}
       onFocus={() => onPrefetch(row.symbol)}
       className={`flex w-full items-center gap-2 px-2.5 py-2 text-left transition-colors hover:bg-surface-hover ${
-        active ? 'bg-surface-hover' : ''
+        active
+          ? 'bg-primary/10 ring-1 ring-inset ring-primary/25'
+          : held
+            ? 'bg-amber-400/[0.06]'
+            : ''
       } screener-row`}
     >
       <div className="min-w-0 flex-1">
-        <div className={`text-sm font-semibold leading-tight ${active ? 'text-primary' : ''}`}>
-          {row.symbol}
+        <div className="flex items-center gap-1.5">
+          <span
+            className={`text-sm font-semibold leading-tight ${
+              active ? 'text-primary' : held ? 'text-amber-300' : ''
+            }`}
+          >
+            {row.symbol}
+          </span>
+          {held ? (
+            <span className="rounded bg-amber-400/15 px-1 py-0.5 text-[9px] font-medium leading-none text-amber-300">
+              持仓
+            </span>
+          ) : null}
         </div>
         <div className="truncate text-xs text-muted">{row.name}</div>
       </div>
@@ -136,11 +153,13 @@ const ScreenerRow = memo(function ScreenerRow({
 export function StockScreener({
   current,
   watchSymbols = [],
+  heldSymbols,
   onSelect,
   onPrefetch,
 }: {
   current: string;
   watchSymbols?: string[];
+  heldSymbols?: Set<string>;
   onSelect: (symbol: string) => void;
   onPrefetch?: (symbol: string) => void;
 }) {
@@ -433,6 +452,7 @@ export function StockScreener({
             key={row.symbol}
             row={row}
             active={row.symbol === current}
+            held={heldSymbols?.has(row.symbol) ?? false}
             metric={
               tab === 'market' &&
               (sortKey === 'volume' || sortKey === 'turnover' || sortKey === 'marketCap')

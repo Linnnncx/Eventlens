@@ -4,6 +4,7 @@ import { AlertTriangle, CheckCircle2 } from 'lucide-react';
 import { previewOrder, simulateOrder } from '../../api/endpoints';
 import type { OrderPreviewRequest, OrderSide, OrderType } from '../../types/api';
 import { formatCurrency } from '../../utils/format';
+import { useDebouncedValue } from '../../hooks/useDebouncedValue';
 
 interface TradePanelProps {
   symbol: string;
@@ -32,13 +33,15 @@ export function TradePanel({ symbol, side, newsId, onSuccess }: TradePanelProps)
     newsId: newsId ?? undefined,
   });
 
-  const previewQuery = useQuery({
-    queryKey: ['preview', symbol, side, orderType, quantity, notional, limitPrice, stopLoss, inputMode],
-    queryFn: () => previewOrder(buildRequest()),
-    enabled: Boolean(
+  const canPreview = Boolean(
       (inputMode === 'qty' && quantity && Number(quantity) > 0) ||
-        (inputMode === 'notional' && notional && Number(notional) > 0),
-    ),
+      (inputMode === 'notional' && notional && Number(notional) > 0),
+  );
+  const previewRequest = useDebouncedValue(buildRequest(), 250);
+  const previewQuery = useQuery({
+    queryKey: ['preview', previewRequest],
+    queryFn: ({ signal }) => previewOrder(previewRequest, signal),
+    enabled: canPreview,
     staleTime: 5_000,
   });
 
@@ -49,6 +52,7 @@ export function TradePanel({ symbol, side, newsId, onSuccess }: TradePanelProps)
       queryClient.invalidateQueries({ queryKey: ['orders'] });
       queryClient.invalidateQueries({ queryKey: ['trades'] });
       queryClient.invalidateQueries({ queryKey: ['positions'] });
+      queryClient.invalidateQueries({ queryKey: ['watchlist'] });
       onSuccess?.();
     },
   });
@@ -212,7 +216,7 @@ export function TradePanel({ symbol, side, newsId, onSuccess }: TradePanelProps)
       <div className="border-t border-border p-4">
         <button
           type="button"
-          disabled={!preview?.canSubmit || submitMut.isPending}
+          disabled={!canPreview || preview?.canSubmit === false || submitMut.isPending}
           onClick={() => submitMut.mutate()}
           className={`w-full rounded-md py-2.5 text-sm font-semibold text-white disabled:opacity-50 ${
             isBuy ? 'bg-up hover:bg-up-dim' : 'bg-down hover:bg-down-dim'

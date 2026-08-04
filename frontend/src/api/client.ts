@@ -41,7 +41,7 @@ export async function apiGet<T>(
   return parseJson<T>(res);
 }
 
-export async function apiPost<T>(path: string, body?: unknown): Promise<T> {
+export async function apiPost<T>(path: string, body?: unknown, signal?: AbortSignal): Promise<T> {
   const res = await fetch(`${API_BASE}${path}`, {
     method: 'POST',
     headers: {
@@ -49,6 +49,7 @@ export async function apiPost<T>(path: string, body?: unknown): Promise<T> {
       'Content-Type': 'application/json',
     },
     body: body !== undefined ? JSON.stringify(body) : undefined,
+    signal,
   });
   if (!res.ok) {
     const errBody = await parseJson<unknown>(res).catch(() => undefined);

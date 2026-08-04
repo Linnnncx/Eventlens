@@ -14,7 +14,7 @@ from app.database.session import WatchlistRow, init_db, SessionLocal
 from app.providers.factory import provider_factory
 from app.providers.yahoo_http import apply_proxy_env
 from app.services.trading import ensure_portfolio
-from app.services.market_hub import get_shared_quote
+from app.services.market_hub import get_shared_quote, prime_shared_quotes
 
 
 class ConnectionManager:
@@ -55,6 +55,7 @@ async def lifespan(app: FastAPI):
             for sym in ["AAPL", "NVDA", "TSLA", "MSFT", "META"]:
                 db.add(WatchlistRow(symbol=sym, created_at=datetime.now(timezone.utc)))
             db.commit()
+        prime_shared_quotes()
     finally:
         db.close()
 

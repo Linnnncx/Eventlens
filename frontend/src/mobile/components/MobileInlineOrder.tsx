@@ -5,6 +5,7 @@ import { previewOrder, simulateOrder } from '../../api/endpoints';
 import type { OrderPreviewRequest, OrderSide, OrderType, Position } from '../../types/api';
 import { changeColorClass, formatPercent, formatPrice } from '../../utils/format';
 import { Stepper } from './ui';
+import { useDebouncedValue } from '../../hooks/useDebouncedValue';
 
 const QUICK_RATIOS = [
   { label: '1/4', ratio: 0.25 },
@@ -68,16 +69,18 @@ export function MobileInlineOrder({
       orderType,
       quantity,
       limitPrice: orderType === 'limit' ? limitPrice : null,
+      referencePrice: price > 0 ? price : null,
       takeProfit: advanced && takeProfit > 0 ? takeProfit : null,
       stopLoss: advanced && stopLoss > 0 ? stopLoss : null,
       extendedHours,
     }),
     [symbol, side, orderType, quantity, limitPrice, advanced, takeProfit, stopLoss, extendedHours],
   );
+  const previewRequest = useDebouncedValue(request, 250);
 
   const { data: preview, isFetching: previewing } = useQuery({
-    queryKey: ['mobile-inline-order-preview', request],
-    queryFn: () => previewOrder(request),
+    queryKey: ['mobile-inline-order-preview', previewRequest],
+    queryFn: ({ signal }) => previewOrder(previewRequest, signal),
     enabled: Boolean(symbol) && quantity > 0 && price > 0,
     staleTime: 10_000,
     retry: false,
@@ -90,6 +93,7 @@ export function MobileInlineOrder({
       queryClient.invalidateQueries({ queryKey: ['portfolio'] });
       queryClient.invalidateQueries({ queryKey: ['orders'] });
       queryClient.invalidateQueries({ queryKey: ['trades'] });
+      queryClient.invalidateQueries({ queryKey: ['watchlist'] });
     },
   });
 

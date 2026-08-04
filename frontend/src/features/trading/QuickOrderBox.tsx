@@ -5,6 +5,7 @@ import { previewOrder, simulateOrder } from '../../api/endpoints';
 import { useWorkbenchStore } from '../../stores/workbenchStore';
 import type { OrderPreviewRequest, OrderSide } from '../../types/api';
 import { formatCurrency } from '../../utils/format';
+import { useDebouncedValue } from '../../hooks/useDebouncedValue';
 import { PriceInput } from './PriceInput';
 import {
   ORDER_CATEGORIES,
@@ -20,6 +21,7 @@ import {
 interface QuickOrderBoxProps {
   symbol: string;
   newsId?: string | null;
+  price?: number;
   onClose?: () => void;
   /** Embed in parent (mobile sheet) instead of fixed+draggable */
   inline?: boolean;
@@ -29,7 +31,7 @@ type InputMode = 'qty' | 'notional';
 
 const POS_KEY = 'eventlens.quickOrder.pos';
 
-export function QuickOrderBox({ symbol, newsId, onClose, inline = false }: QuickOrderBoxProps) {
+export function QuickOrderBox({ symbol, newsId, price = 0, onClose, inline = false }: QuickOrderBoxProps) {
   const queryClient = useQueryClient();
   const tradeSide = useWorkbenchStore((s) => s.tradeSide);
   const setTradeSide = useWorkbenchStore((s) => s.setTradeSide);
@@ -112,29 +114,23 @@ export function QuickOrderBox({ symbol, newsId, onClose, inline = false }: Quick
             ? Number(fields.notional)
             : undefined,
       limitPrice: typeDef.execAs === 'limit' && limitRaw ? limitRaw : undefined,
+      referencePrice: price > 0 ? price : undefined,
       stopLoss: stopLoss || undefined,
       takeProfit: takeProfit || undefined,
       newsId: newsId ?? fields.eventNewsId ?? undefined,
     };
   };
 
-  const canPreview =
+  const canPreview = Boolean(
     (inputMode === 'qty' && quantity && Number(quantity) > 0) ||
     (inputMode === 'notional' && notional && Number(notional) > 0) ||
-    (orderKind === 'dca' && fields.notional && Number(fields.notional) > 0);
+    (orderKind === 'dca' && fields.notional && Number(fields.notional) > 0),
+  );
+  const previewRequest = useDebouncedValue(buildRequest(), 250);
 
   const previewQuery = useQuery({
-    queryKey: [
-      'quick-preview',
-      symbol,
-      side,
-      orderKind,
-      quantity,
-      notional,
-      inputMode,
-      fields,
-    ],
-    queryFn: () => previewOrder(buildRequest()),
+    queryKey: ['quick-preview', previewRequest],
+    queryFn: ({ signal }) => previewOrder(previewRequest, signal),
     enabled: Boolean(canPreview),
     staleTime: 4_000,
   });
@@ -146,6 +142,7 @@ export function QuickOrderBox({ symbol, newsId, onClose, inline = false }: Quick
       queryClient.invalidateQueries({ queryKey: ['orders'] });
       queryClient.invalidateQueries({ queryKey: ['trades'] });
       queryClient.invalidateQueries({ queryKey: ['positions'] });
+      queryClient.invalidateQueries({ queryKey: ['watchlist'] });
       setQuantity('');
       setNotional('');
     },
@@ -495,7 +492,7 @@ export function QuickOrderBox({ symbol, newsId, onClose, inline = false }: Quick
       <div className="shrink-0 border-t border-border bg-surface-raised/40 p-4">
         <button
           type="button"
-          disabled={!preview?.canSubmit || submitMut.isPending}
+          disabled={!canPreview || preview?.canSubmit === false || submitMut.isPending}
           onClick={() => submitMut.mutate()}
           className={`w-full rounded-xl py-3 text-base font-semibold text-white shadow-sm transition-opacity disabled:opacity-45 ${
             isBuy ? 'bg-up hover:bg-up-dim' : 'bg-down hover:bg-down-dim'

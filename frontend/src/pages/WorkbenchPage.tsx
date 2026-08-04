@@ -242,6 +242,10 @@ export function WorkbenchPage() {
   }, [portfolio, setPortfolio]);
 
   const watchSymbols = watchlist?.items ?? [];
+  const heldSymbols = useMemo(
+    () => new Set((portfolio?.positions ?? []).map((item) => item.symbol)),
+    [portfolio],
+  );
   const socketSymbols = useMemo(() => {
     // Cap subscriptions — each quote used to re-render the whole workbench.
     const all = [...new Set([symbol, ...watchSymbols, ...recentSymbols])];
@@ -551,6 +555,7 @@ export function WorkbenchPage() {
             <StockScreener
               current={symbol}
               watchSymbols={watchSymbols}
+              heldSymbols={heldSymbols}
               onSelect={switchSymbol}
               onPrefetch={prefetchSymbol}
             />
@@ -705,12 +710,6 @@ export function WorkbenchPage() {
                 </div>
               </div>
 
-              <ResizeHandle
-                axis="y"
-                title="拖拽调整底栏高度 · 双击还原"
-                onDrag={(d) => nudge('bottomHeight', d)}
-                onReset={() => reset('bottomHeight')}
-              />
             </div>
           </div>
 
@@ -771,6 +770,7 @@ export function WorkbenchPage() {
       {quickOrderOpen && !indexMode && (
         <QuickOrderBox
           symbol={symbol}
+          price={livePrice}
           newsId={selectedEventId}
           onClose={() => setQuickOrderOpen(false)}
         />
@@ -815,6 +815,7 @@ export function WorkbenchPage() {
       <TradeSheet
         open={tradeSheetOpen}
         symbol={symbol}
+        price={livePrice}
         newsId={selectedEventId}
         onClose={() => setTradeSheetOpen(false)}
       />
@@ -950,7 +951,7 @@ function NewsTab({
           ? `${symbol} · ${bucketLabel(barTime)} · ${timeframe} · ${items.length} 条`
           : `${symbol} · ${items.length} 条 · 点击查看详情`}
       </div>
-      <div className="grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-3">
+      <div className="grid grid-cols-1 gap-3 md:grid-cols-2 lg:grid-cols-3">
         {visibleItems.map((item) => {
           const selected = selectedId === item.id;
           const session = marketSessionOf(item.publishedAt);

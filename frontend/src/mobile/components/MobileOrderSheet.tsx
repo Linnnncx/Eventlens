@@ -7,6 +7,7 @@ import { useWorkbenchStore } from '../../stores/workbenchStore';
 import type { OrderPreviewRequest, OrderSide, OrderType, Position } from '../../types/api';
 import { formatPrice } from '../../utils/format';
 import { Stepper } from './ui';
+import { useDebouncedValue } from '../../hooks/useDebouncedValue';
 
 interface MobileOrderSheetProps {
   open: boolean;
@@ -95,16 +96,18 @@ export function MobileOrderSheet({
       orderType,
       quantity,
       limitPrice: orderType === 'limit' ? limitPrice : null,
+      referencePrice: price > 0 ? price : null,
       takeProfit: advanced && takeProfit > 0 ? takeProfit : null,
       stopLoss: advanced && stopLoss > 0 ? stopLoss : null,
       extendedHours,
     }),
     [symbol, side, orderType, quantity, limitPrice, advanced, takeProfit, stopLoss, extendedHours],
   );
+  const previewRequest = useDebouncedValue(request, 250);
 
   const { data: preview, isFetching: previewing } = useQuery({
-    queryKey: ['mobile-order-preview', request],
-    queryFn: () => previewOrder(request),
+    queryKey: ['mobile-order-preview', previewRequest],
+    queryFn: ({ signal }) => previewOrder(previewRequest, signal),
     enabled: open && quantity > 0,
     staleTime: 10_000,
     retry: false,
@@ -117,6 +120,7 @@ export function MobileOrderSheet({
       queryClient.invalidateQueries({ queryKey: ['portfolio'] });
       queryClient.invalidateQueries({ queryKey: ['orders'] });
       queryClient.invalidateQueries({ queryKey: ['trades'] });
+      queryClient.invalidateQueries({ queryKey: ['watchlist'] });
     },
   });
 

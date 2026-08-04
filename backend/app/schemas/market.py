@@ -249,6 +249,7 @@ class OrderPreviewRequest(BaseModel):
     quantity: Optional[float] = None
     notional: Optional[float] = None
     limit_price: Optional[float] = Field(default=None, alias="limitPrice")
+    reference_price: Optional[float] = Field(default=None, alias="referencePrice")
     stop_loss: Optional[float] = Field(default=None, alias="stopLoss")
     take_profit: Optional[float] = Field(default=None, alias="takeProfit")
     extended_hours: bool = Field(default=False, alias="extendedHours")

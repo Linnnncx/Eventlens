@@ -9,8 +9,7 @@ from zoneinfo import ZoneInfo
 from sqlalchemy.orm import Session
 
 from app.core.config import get_settings
-from app.database.session import OrderRow, PortfolioRow, PositionRow, TradeRow
-from app.providers.factory import provider_factory
+from app.database.session import OrderRow, PortfolioRow, PositionRow, TradeRow, WatchlistRow
 from app.providers.llm.providers import RuleBasedLLMProvider
 from app.providers.market.fixture_provider import find_universe
 from app.schemas.market import OrderPreviewRequest, OrderPreviewResponse, PortfolioState, RiskSummary
@@ -34,6 +33,24 @@ def ensure_portfolio(db: Session) -> PortfolioRow:
     db.commit()
     db.refresh(row)
     return row
+
+
+def ensure_positions_watchlisted(db: Session) -> list[str]:
+    """Persist every open position in the watchlist and return the normalized list."""
+    held = {
+        symbol.upper()
+        for (symbol,) in db.query(PositionRow.symbol).filter(PositionRow.quantity > 1e-9).all()
+    }
+    existing = {symbol.upper() for (symbol,) in db.query(WatchlistRow.symbol).all()}
+    now = datetime.now(timezone.utc)
+    for symbol in held - existing:
+        db.add(WatchlistRow(symbol=symbol, created_at=now))
+    if held - existing:
+        db.commit()
+    return [
+        row.symbol
+        for row in db.query(WatchlistRow).order_by(WatchlistRow.created_at.desc()).all()
+    ]
 
 
 async def _latest_price(symbol: str) -> float:
@@ -163,12 +180,18 @@ def _today_pnl(
     return today, pct
 
 
-async def build_portfolio_state(db: Session) -> PortfolioState:
+async def build_portfolio_state(
+    db: Session,
+    price_overrides: dict[str, float] | None = None,
+) -> PortfolioState:
     port = ensure_portfolio(db)
     positions = db.query(PositionRow).all()
     prices: dict[str, float] = {}
     prev_closes: dict[str, float] = {}
     async def _quote_one(symbol: str, fallback: float) -> tuple[str, float, float]:
+        override = (price_overrides or {}).get(symbol)
+        if override is not None and override > 0:
+            return symbol, override, fallback
         try:
             q, _provider, _cached = await get_shared_quote(symbol, max_age=5.0)
             return symbol, q.price, q.previous_close or fallback
@@ -363,7 +386,13 @@ def evaluate_risk_rules(facts: dict[str, Any]) -> list[str]:
 
 async def preview_order(db: Session, req: OrderPreviewRequest) -> OrderPreviewResponse:
     port = ensure_portfolio(db)
-    price = req.limit_price if req.order_type == "limit" and req.limit_price else await _latest_price(req.symbol)
+    price = (
+        req.limit_price
+        if req.order_type == "limit" and req.limit_price
+        else req.reference_price
+        if req.reference_price and req.reference_price > 0
+        else await _latest_price(req.symbol)
+    )
     if req.quantity and req.quantity > 0:
         qty = float(req.quantity)
     elif req.notional and req.notional > 0:
@@ -390,7 +419,7 @@ async def preview_order(db: Session, req: OrderPreviewRequest) -> OrderPreviewRe
     value = qty * price
     fee_info = calc_futu_us_fee(req.side, qty, price)
     fee = float(fee_info["total"])
-    state = await build_portfolio_state(db)
+    state = await build_portfolio_state(db, {req.symbol.upper(): price})
     pos = next((p for p in state.positions if p["symbol"] == req.symbol.upper()), None)
     pos_val_before = pos["marketValue"] if pos else 0
     weight_before = pos["weight"] if pos else 0
@@ -445,11 +474,10 @@ async def preview_order(db: Session, req: OrderPreviewRequest) -> OrderPreviewRe
     }
     warnings = evaluate_risk_rules(facts)
     facts["ruleWarnings"] = warnings
-    llm = provider_factory.create_llm_provider()
-    try:
-        risk = await llm.generate_risk_summary(facts)
-    except Exception:
-        risk = await RuleBasedLLMProvider().generate_risk_summary(facts)
+    # Order previews are latency-sensitive and are recomputed while the user edits
+    # the form. Keep the same deterministic risk facts/warnings, but never block
+    # the confirm button on a cloud LLM round-trip (which can take 10–30 seconds).
+    risk = await RuleBasedLLMProvider().generate_risk_summary(facts)
 
     return OrderPreviewResponse(
         estimatedValue=value,
@@ -489,7 +517,7 @@ async def simulate_order(db: Session, req: OrderPreviewRequest) -> dict[str, Any
     filled_price = price
     if req.order_type == "limit" and req.limit_price is not None:
         # Keep working if not immediately marketable; for demo fill if marketable else open
-        live = await _latest_price(symbol)
+        live = req.reference_price if req.reference_price and req.reference_price > 0 else await _latest_price(symbol)
         marketable = (req.side == "buy" and live <= req.limit_price) or (
             req.side == "sell" and live >= req.limit_price
         )
@@ -536,6 +564,8 @@ async def simulate_order(db: Session, req: OrderPreviewRequest) -> dict[str, Any
                         updated_at=now,
                     )
                 )
+            if not db.query(WatchlistRow).filter(WatchlistRow.symbol == symbol).first():
+                db.add(WatchlistRow(symbol=symbol, created_at=now))
         else:
             port.cash += qty * filled_price - fee
             pos = db.query(PositionRow).filter(PositionRow.symbol == symbol).first()
@@ -566,7 +596,7 @@ async def simulate_order(db: Session, req: OrderPreviewRequest) -> dict[str, Any
             from app.services.equity_history import record_equity_snapshot
 
             # Recompute MV quickly from current positions + last preview equity-ish
-            state = await build_portfolio_state(db)
+            state = await build_portfolio_state(db, {symbol: filled_price})
             record_equity_snapshot(state.equity, state.cash, state.market_value, force=True)
         except Exception:
             pass

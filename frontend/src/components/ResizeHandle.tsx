@@ -134,17 +134,19 @@ export const DEFAULT_LAYOUT: WorkbenchLayout = {
   rightWidth: 520,
   chartHeight: 360,
   indicatorHeight: 240,
-  bottomHeight: 200,
+  bottomHeight: 420,
 };
 
-const STORAGE_KEY = 'eventlens.workbench.layout.v2';
+const STORAGE_KEY = 'eventlens.workbench.layout.v3';
 
 const LIMITS = {
   leftWidth: { min: 160, max: 560 },
   rightWidth: { min: 320, max: 800 },
   chartHeight: { min: 180, max: 900 },
   indicatorHeight: { min: 100, max: 1200 },
-  bottomHeight: { min: 220, max: 900 },
+  // The lower workspace is intentionally fixed: its content scrolls internally
+  // instead of making the page progressively deeper.
+  bottomHeight: { min: 420, max: 420 },
 } as const;
 
 function clamp(key: keyof WorkbenchLayout, value: number): number {
@@ -154,7 +156,10 @@ function clamp(key: keyof WorkbenchLayout, value: number): number {
 
 function loadLayout(): WorkbenchLayout {
   try {
-    const raw = localStorage.getItem(STORAGE_KEY) ?? localStorage.getItem('eventlens.workbench.layout.v1');
+    const raw =
+      localStorage.getItem(STORAGE_KEY) ??
+      localStorage.getItem('eventlens.workbench.layout.v2') ??
+      localStorage.getItem('eventlens.workbench.layout.v1');
     if (!raw) return { ...DEFAULT_LAYOUT };
     const parsed = JSON.parse(raw) as Partial<WorkbenchLayout>;
     return {
@@ -169,7 +174,13 @@ function loadLayout(): WorkbenchLayout {
         'indicatorHeight',
         parsed.indicatorHeight ?? DEFAULT_LAYOUT.indicatorHeight,
       ),
-      bottomHeight: clamp('bottomHeight', parsed.bottomHeight ?? DEFAULT_LAYOUT.bottomHeight),
+      // Older layouts defaulted to 200/220px, which only exposed a thin strip of News.
+      bottomHeight: clamp(
+        'bottomHeight',
+        (parsed.bottomHeight ?? 0) <= 220
+          ? DEFAULT_LAYOUT.bottomHeight
+          : (parsed.bottomHeight ?? DEFAULT_LAYOUT.bottomHeight),
+      ),
     };
   } catch {
     return { ...DEFAULT_LAYOUT };

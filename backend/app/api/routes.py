@@ -38,10 +38,12 @@ from app.services.range_analysis import build_news_facts, build_technical_facts,
 from app.services.danmaku import list_danmaku, post_danmaku
 from app.services.orderbook import build_order_book
 from app.services.market_hub import get_shared_quote
+from app.services.market_store import load_bars, save_bars, save_snapshots
 from app.services.trading import (
     build_portfolio_state,
     closed_position_rankings,
     ensure_portfolio,
+    ensure_positions_watchlisted,
     list_orders,
     list_trades,
     preview_order,
@@ -82,6 +84,8 @@ async def _load_screener(cache_key: str, equities_only: bool) -> tuple[list, str
         batch = max(5, min(40, get_settings().yfinance_batch_size))
         for i in range(0, len(syms), batch):
             snaps.extend(await market.get_snapshots(syms[i : i + batch]))
+        if snaps and market.name != "fixture":
+            await asyncio.to_thread(save_snapshots, snaps)
         result = (snaps, market.name)
         _screener_cache[cache_key] = result
         _screener_last[cache_key] = result
@@ -295,10 +299,45 @@ async def market_bars(
                 meta=_meta(provider, cached=True),
             ).model_dump(by_alias=True)
         market = provider_factory.create_market_provider()
+        if start is None and end is None and market.name != "fixture":
+            stored = await asyncio.to_thread(load_bars, symbol, timeframe, market.name, limit or 300)
+            if stored:
+                used_start = stored[0].timestamp
+                used_end = stored[-1].timestamp
+                _bars_cache[cache_key] = (stored, market.name, used_start, used_end)
+
+                async def refresh_stored_bars() -> None:
+                    try:
+                        fresh = await market.get_bars(symbol, timeframe, None, None, limit)
+                        if not fresh:
+                            return
+                        await asyncio.to_thread(save_bars, market.name, symbol, timeframe, fresh)
+                        _bars_cache[cache_key] = (
+                            fresh,
+                            market.name,
+                            fresh[0].timestamp,
+                            fresh[-1].timestamp,
+                        )
+                    except Exception:
+                        pass
+
+                task = asyncio.create_task(refresh_stored_bars())
+                _background_tasks.add(task)
+                task.add_done_callback(_background_tasks.discard)
+                return BarsResponse(
+                    symbol=symbol,
+                    timeframe=timeframe,
+                    start=used_start,
+                    end=used_end,
+                    bars=stored,
+                    meta=_meta(market.name, cached=True, stale=True),
+                ).model_dump(by_alias=True)
         bars = await market.get_bars(symbol, timeframe, start, end, limit)
         used_start = bars[0].timestamp if bars else start
         used_end = bars[-1].timestamp if bars else end
         _bars_cache[cache_key] = (bars, market.name, used_start, used_end)
+        if bars and market.name != "fixture":
+            await asyncio.to_thread(save_bars, market.name, symbol, timeframe, bars)
     return BarsResponse(
         symbol=symbol,
         timeframe=timeframe,
@@ -496,8 +535,7 @@ async def event_reaction(
 
 @router.get("/watchlist")
 def get_watchlist(db: Session = Depends(get_db)):
-    rows = db.query(WatchlistRow).order_by(WatchlistRow.created_at.desc()).all()
-    return {"items": [r.symbol for r in rows]}
+    return {"items": ensure_positions_watchlisted(db)}
 
 
 @router.post("/watchlist/{symbol}")

@@ -1221,7 +1221,7 @@ export function ChartPanel({
       </div>
 
       <div className="flex" style={{ height }}>
-        <aside className="flex w-[3.25rem] shrink-0 flex-col items-center gap-1 overflow-y-auto border-r border-border/80 bg-gradient-to-b from-surface-raised to-surface py-1.5">
+        <aside className="flex w-[2.875rem] shrink-0 flex-col items-center gap-0.5 overflow-y-auto border-r border-border/80 bg-gradient-to-b from-surface-raised to-surface py-1.5">
           {DRAW_TOOLS.map((t) => {
             const Icon = t.icon;
             const active = drawTool === t.id;
@@ -1231,34 +1231,34 @@ export function ChartPanel({
                 type="button"
                 title={t.tip}
                 onClick={() => selectDrawTool(t.id)}
-                className={`flex w-11 flex-col items-center gap-0.5 rounded-lg px-0.5 py-1.5 text-[10px] font-medium leading-tight ${
+                className={`flex w-10 flex-col items-center gap-0.5 rounded-md px-0.5 py-1 text-[9px] font-medium leading-tight ${
                   active
                     ? 'bg-primary/20 text-primary shadow-sm ring-1 ring-primary/30'
                     : 'text-muted hover:bg-surface-hover hover:text-gray-200'
                 }`}
               >
-                <Icon className="h-4 w-4" strokeWidth={2} />
+                <Icon className="h-3.5 w-3.5" strokeWidth={2} />
                 <span className="max-w-full truncate">{t.label}</span>
               </button>
             );
           })}
-          <div className="my-0.5 h-px w-8 bg-border" />
+          <div className="my-0.5 h-px w-7 bg-border" />
           <button
             type="button"
             title="撤销上一笔画线"
             onClick={undoLastDrawing}
-            className="flex w-11 flex-col items-center gap-0.5 rounded-lg px-0.5 py-1.5 text-[10px] font-medium text-muted hover:bg-surface-hover hover:text-gray-200"
+            className="flex w-10 flex-col items-center gap-0.5 rounded-md px-0.5 py-1 text-[9px] font-medium text-muted hover:bg-surface-hover hover:text-gray-200"
           >
-            <Undo2 className="h-4 w-4" />
+            <Undo2 className="h-3.5 w-3.5" />
             <span>撤销</span>
           </button>
           <button
             type="button"
             title="清除全部画线"
             onClick={clearDrawings}
-            className="flex w-11 flex-col items-center gap-0.5 rounded-lg px-0.5 py-1.5 text-[10px] font-medium text-muted hover:bg-surface-hover hover:text-down"
+            className="flex w-10 flex-col items-center gap-0.5 rounded-md px-0.5 py-1 text-[9px] font-medium text-muted hover:bg-surface-hover hover:text-down"
           >
-            <Eraser className="h-4 w-4" />
+            <Eraser className="h-3.5 w-3.5" />
             <span>清除</span>
           </button>
         </aside>

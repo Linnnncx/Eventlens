@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useDeferredValue, useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import {
@@ -158,21 +158,21 @@ export function MobileStockPage() {
 
   const { data: profile } = useQuery({
     queryKey: ['symbol-profile', symbol],
-    queryFn: () => fetchSymbolProfile(symbol),
+    queryFn: ({ signal }) => fetchSymbolProfile(symbol, signal),
     enabled: Boolean(symbol),
     staleTime: 600_000,
   });
 
   const { data: quoteData } = useQuery({
     queryKey: ['quote', symbol],
-    queryFn: () => fetchQuote(symbol),
+    queryFn: ({ signal }) => fetchQuote(symbol, signal),
     enabled: Boolean(symbol),
     refetchInterval: 30_000,
   });
 
   const { data: barsData, isLoading: barsLoading } = useQuery({
     queryKey: ['bars', symbol, timeframe],
-    queryFn: () => fetchBars(symbol, timeframe, { limit: 300 }),
+    queryFn: ({ signal }) => fetchBars(symbol, timeframe, { limit: 300, signal }),
     enabled: Boolean(symbol),
     staleTime: 30_000,
   });
@@ -182,9 +182,10 @@ export function MobileStockPage() {
   // Same events feed as desktop — windowed by timeframe so older candles still get news.
   const { data: eventsData } = useQuery({
     queryKey: ['events', symbol, timeframe, newsWindow.start, newsWindow.limit],
-    queryFn: () =>
-      fetchEvents(symbol, timeframe, { start: newsWindow.start, limit: newsWindow.limit }),
-    enabled: Boolean(symbol) && !indexMode,
+    queryFn: ({ signal }) =>
+      fetchEvents(symbol, timeframe, { start: newsWindow.start, limit: newsWindow.limit, signal }),
+    // Let quote + chart render first; the large news/anchor payload is secondary.
+    enabled: Boolean(symbol) && !indexMode && Boolean(barsData),
     staleTime: 60_000,
     refetchInterval: 60_000,
     retry: 2,
@@ -219,7 +220,7 @@ export function MobileStockPage() {
     () => (eventsData?.items?.length ? eventsData.items : EMPTY_NEWS),
     [eventsData],
   );
-  const chartNews = allNews;
+  const chartNews = useDeferredValue(allNews);
   const newsByBar = useMemo(
     () => newsByBarMap(bars, chartNews, timeframe),
     [bars, chartNews, timeframe],
@@ -233,8 +234,8 @@ export function MobileStockPage() {
 
   const listNews = useMemo(() => {
     if (selectedNews != null) return selectedNews;
-    return rankNews(allNews).slice(0, 60);
-  }, [selectedNews, allNews]);
+    return rankNews(chartNews).slice(0, 60);
+  }, [selectedNews, chartNews]);
 
   const selectedBar = useMemo(() => {
     if (selectedBarTime == null) return null;
