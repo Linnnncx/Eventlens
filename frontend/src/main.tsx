@@ -24,3 +24,12 @@ createRoot(document.getElementById('root')!).render(
     </QueryClientProvider>
   </StrictMode>,
 );
+
+// PWA: register only in production builds (dev HMR fights with SW caching).
+if (import.meta.env.PROD && 'serviceWorker' in navigator) {
+  window.addEventListener('load', () => {
+    navigator.serviceWorker.register('/sw.js').catch(() => {
+      /* ignore — installability still works via manifest on supported browsers */
+    });
+  });
+}

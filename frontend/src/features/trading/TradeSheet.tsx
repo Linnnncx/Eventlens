@@ -1,17 +1,16 @@
 import { useEffect } from 'react';
 import { X } from 'lucide-react';
-import { TradePanel } from './TradePanel';
-import type { OrderSide } from '../../types/api';
+import { OrderBook } from './OrderBook';
+import { QuickOrderBox } from './QuickOrderBox';
 
 interface TradeSheetProps {
   open: boolean;
   symbol: string;
-  side: OrderSide;
   newsId?: string | null;
   onClose: () => void;
 }
 
-export function TradeSheet({ open, symbol, side, newsId, onClose }: TradeSheetProps) {
+export function TradeSheet({ open, symbol, newsId, onClose }: TradeSheetProps) {
   useEffect(() => {
     if (open) {
       document.body.style.overflow = 'hidden';
@@ -33,15 +32,20 @@ export function TradeSheet({ open, symbol, side, newsId, onClose }: TradeSheetPr
         className="absolute inset-0 bg-black/60"
         onClick={onClose}
       />
-      <div className="absolute inset-x-0 bottom-0 max-h-[85vh] overflow-hidden rounded-t-xl border border-border bg-surface-card shadow-2xl">
-        <div className="flex items-center justify-between border-b border-border px-4 py-2">
-          <span className="text-sm font-medium text-gray-200">Trade</span>
+      <div className="absolute inset-x-0 bottom-0 flex max-h-[90vh] flex-col overflow-hidden rounded-t-xl border border-border bg-surface-card shadow-2xl">
+        <div className="flex shrink-0 items-center justify-between border-b border-border px-4 py-2">
+          <span className="text-sm font-medium text-gray-200">Trade · {symbol}</span>
           <button type="button" onClick={onClose} className="btn-ghost p-1">
             <X className="h-5 w-5" />
           </button>
         </div>
-        <div className="max-h-[calc(85vh-44px)] overflow-y-auto">
-          <TradePanel symbol={symbol} side={side} newsId={newsId} onSuccess={onClose} />
+        <div className="grid min-h-0 flex-1 grid-rows-[minmax(180px,38%)_1fr] overflow-hidden">
+          <div className="min-h-0 overflow-hidden border-b border-border">
+            <OrderBook symbol={symbol} levels={8} />
+          </div>
+          <div className="min-h-0 overflow-hidden">
+            <QuickOrderBox inline symbol={symbol} newsId={newsId} onClose={onClose} />
+          </div>
         </div>
       </div>
     </div>

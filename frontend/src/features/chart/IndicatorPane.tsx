@@ -2,7 +2,9 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   createChart,
   ColorType,
+  CrosshairMode,
   type IChartApi,
+  type ISeriesApi,
   type HistogramData,
   type LineData,
   type LogicalRange,
@@ -25,17 +27,20 @@ import {
 } from '../../utils/indicators';
 import {
   MAIN_INDICATORS,
+  MA_PERIOD_COLORS,
   SUB_INDICATORS,
   DEFAULT_SUB_PANE_HEIGHT,
   MIN_SUB_PANE_HEIGHT,
   clampSubPaneHeight,
+  formatMaLabel,
   loadSubPaneHeights,
+  normalizeMaPeriods,
   saveSubPaneHeights,
   type MainIndicatorId,
   type SubIndicatorId,
 } from './indicatorConfig';
 
-const TOOLBAR_H = 54;
+const TOOLBAR_H = 72;
 const LABEL_H = 20;
 const HANDLE_H = 8;
 
@@ -106,6 +111,23 @@ const CHART_OPTS = {
     // Match the main K-line chart so the right edge lines up
     rightOffset: 4,
   },
+  crosshair: {
+    mode: CrosshairMode.Normal,
+    vertLine: {
+      visible: true,
+      labelVisible: false,
+      color: 'rgba(154, 163, 181, 0.55)',
+      width: 1 as const,
+      style: 2 as const,
+    },
+    horzLine: {
+      visible: true,
+      labelVisible: true,
+      color: 'rgba(154, 163, 181, 0.45)',
+      width: 1 as const,
+      style: 2 as const,
+    },
+  },
   // Left-drag enabled; time axis is re-locked to the main chart so Y can move.
   handleScroll: {
     mouseWheel: true,
@@ -125,8 +147,12 @@ interface Props {
   bars: Bar[];
   /** Logical range from the main K-line chart — keeps panes locked together. */
   visibleRange: LogicalRange | null;
+  /** Unix seconds of the main-chart crosshair (null when cleared). */
+  crosshairTime?: number | null;
   enabledMain: MainIndicatorId[];
   enabledSub: SubIndicatorId[];
+  maPeriods: number[];
+  onMaPeriodsChange: (periods: number[]) => void;
   onToggleMain: (id: MainIndicatorId) => void;
   onToggleSub: (id: SubIndicatorId) => void;
   /** Total height of the indicator block (owned by the workbench layout). */
@@ -138,13 +164,20 @@ interface Props {
 export function IndicatorPane({
   bars,
   visibleRange,
+  crosshairTime = null,
   enabledMain,
   enabledSub,
+  maPeriods,
+  onMaPeriodsChange,
   onToggleMain,
   onToggleSub,
   height,
   onRequestHeightDelta,
 }: Props) {
+  const [maDraft, setMaDraft] = useState(maPeriods.join(','));
+  useEffect(() => {
+    setMaDraft(maPeriods.join(','));
+  }, [maPeriods]);
   const closes = useMemo(() => bars.map((b) => b.close), [bars]);
   const highs = useMemo(() => bars.map((b) => b.high), [bars]);
   const lows = useMemo(() => bars.map((b) => b.low), [bars]);
@@ -217,10 +250,57 @@ export function IndicatorPane({
             <IndicatorChip
               key={item.id}
               active={enabledMain.includes(item.id)}
-              label={item.label}
+              label={item.id === 'ma' ? formatMaLabel(maPeriods) : item.label}
               onClick={() => onToggleMain(item.id)}
             />
           ))}
+          {enabledMain.includes('ma') && (
+            <form
+              className="ml-1 flex shrink-0 items-center gap-1"
+              onSubmit={(e) => {
+                e.preventDefault();
+                const parsed = normalizeMaPeriods(
+                  maDraft
+                    .split(/[,/\s]+/)
+                    .map((s) => s.trim())
+                    .filter(Boolean)
+                    .map(Number),
+                );
+                onMaPeriodsChange(parsed);
+                setMaDraft(parsed.join(','));
+              }}
+            >
+              <span className="text-[10px] text-muted">周期</span>
+              <input
+                value={maDraft}
+                onChange={(e) => setMaDraft(e.target.value)}
+                onBlur={() => {
+                  const parsed = normalizeMaPeriods(
+                    maDraft
+                      .split(/[,/\s]+/)
+                      .map((s) => s.trim())
+                      .filter(Boolean)
+                      .map(Number),
+                  );
+                  onMaPeriodsChange(parsed);
+                  setMaDraft(parsed.join(','));
+                }}
+                placeholder="5,10,20"
+                title="自定义 MA 周期，逗号分隔，最多 5 条"
+                className="w-24 rounded border border-border bg-surface px-1.5 py-0.5 text-[11px] text-foreground outline-none focus:border-accent"
+              />
+              <div className="flex items-center gap-0.5">
+                {maPeriods.map((p, i) => (
+                  <span
+                    key={`${p}-${i}`}
+                    className="h-1.5 w-1.5 rounded-full"
+                    style={{ background: MA_PERIOD_COLORS[i] ?? '#94a3b8' }}
+                    title={`MA${p}`}
+                  />
+                ))}
+              </div>
+            </form>
+          )}
         </div>
         <div className="flex items-center gap-2 overflow-x-auto">
           <span className="w-12 shrink-0 text-[10px] font-medium text-muted">副图</span>
@@ -250,6 +330,7 @@ export function IndicatorPane({
                 bars={bars}
                 height={h}
                 visibleRange={visibleRange}
+                crosshairTime={crosshairTime}
                 macdData={macdData}
                 rsiData={rsiData}
                 stochData={stochData}
@@ -306,6 +387,8 @@ interface SlotProps {
   bars: Bar[];
   height: number;
   visibleRange: LogicalRange | null;
+  /** Unix seconds — sync vertical crosshair with the main chart. */
+  crosshairTime: number | null;
   macdData: ReturnType<typeof macd>;
   rsiData: number[];
   stochData: ReturnType<typeof stochastic>;
@@ -325,6 +408,7 @@ function IndicatorSlot({
   bars,
   height,
   visibleRange,
+  crosshairTime,
   macdData,
   rsiData,
   stochData,
@@ -339,6 +423,8 @@ function IndicatorSlot({
 }: SlotProps) {
   const hostRef = useRef<HTMLDivElement>(null);
   const chartRef = useRef<IChartApi | null>(null);
+  const primarySeriesRef = useRef<ISeriesApi<'Line'> | ISeriesApi<'Histogram'> | null>(null);
+  const valueByTimeRef = useRef<Map<number, number>>(new Map());
   const syncingRef = useRef(false);
   const visibleRangeRef = useRef(visibleRange);
   visibleRangeRef.current = visibleRange;
@@ -348,6 +434,19 @@ function IndicatorSlot({
 
     const chart = createChart(hostRef.current, { ...CHART_OPTS, height });
     chartRef.current = chart;
+    valueByTimeRef.current = new Map();
+    primarySeriesRef.current = null;
+
+    const rememberValues = (rows: LineData[] | HistogramData[]) => {
+      const map = valueByTimeRef.current;
+      for (const row of rows) {
+        const t = typeof row.time === 'number' ? row.time : null;
+        if (t == null) continue;
+        if ('value' in row && typeof row.value === 'number' && Number.isFinite(row.value)) {
+          map.set(t, row.value);
+        }
+      }
+    };
 
     // Invisible whitespace series spanning every bar — guarantees the time scale has
     // the same logical indices as the main K-line chart (MACD/RSI alone start later
@@ -361,6 +460,7 @@ function IndicatorSlot({
     });
     base.setData(bars.map((b) => ({ time: toTime(b.timestamp) }) as LineData));
     base.applyOptions({ visible: false });
+    primarySeriesRef.current = base;
 
     if (id === 'macd') {
       const hist = chart.addHistogramSeries({
@@ -368,50 +468,75 @@ function IndicatorSlot({
       });
       const macdLine = chart.addLineSeries({ color: '#3b82f6', lineWidth: 1 });
       const signal = chart.addLineSeries({ color: '#f59e0b', lineWidth: 1 });
-      hist.setData(
-        alignHistogram(
-          bars,
-          macdData.map((r) => r.histogram),
-          (v) => (v >= 0 ? 'rgba(34,197,94,0.5)' : 'rgba(239,68,68,0.5)'),
-        ),
+      const histData = alignHistogram(
+        bars,
+        macdData.map((r) => r.histogram),
+        (v) => (v >= 0 ? 'rgba(34,197,94,0.5)' : 'rgba(239,68,68,0.5)'),
       );
-      macdLine.setData(alignLine(bars, macdData.map((r) => r.macd)));
-      signal.setData(alignLine(bars, macdData.map((r) => r.signal)));
+      const macdLineData = alignLine(bars, macdData.map((r) => r.macd));
+      const signalData = alignLine(bars, macdData.map((r) => r.signal));
+      hist.setData(histData);
+      macdLine.setData(macdLineData);
+      signal.setData(signalData);
+      rememberValues(macdLineData);
+      primarySeriesRef.current = macdLine;
     } else if (id === 'rsi') {
       const line = chart.addLineSeries({ color: '#a78bfa', lineWidth: 1 });
-      line.setData(alignLine(bars, rsiData));
+      const data = alignLine(bars, rsiData);
+      line.setData(data);
+      rememberValues(data);
+      primarySeriesRef.current = line;
       line.createPriceLine({ price: 70, color: '#ef444480', lineWidth: 1, lineStyle: 2, axisLabelVisible: false });
       line.createPriceLine({ price: 30, color: '#22c55e80', lineWidth: 1, lineStyle: 2, axisLabelVisible: false });
     } else if (id === 'stoch') {
       const kLine = chart.addLineSeries({ color: '#3b82f6', lineWidth: 1 });
       const dLine = chart.addLineSeries({ color: '#f59e0b', lineWidth: 1 });
-      kLine.setData(alignLine(bars, stochData.map((r) => r.k)));
-      dLine.setData(alignLine(bars, stochData.map((r) => r.d)));
+      const kData = alignLine(bars, stochData.map((r) => r.k));
+      const dData = alignLine(bars, stochData.map((r) => r.d));
+      kLine.setData(kData);
+      dLine.setData(dData);
+      rememberValues(kData);
+      primarySeriesRef.current = kLine;
       kLine.createPriceLine({ price: 80, color: '#ef444480', lineWidth: 1, lineStyle: 2, axisLabelVisible: false });
       kLine.createPriceLine({ price: 20, color: '#22c55e80', lineWidth: 1, lineStyle: 2, axisLabelVisible: false });
     } else if (id === 'cci') {
       const line = chart.addLineSeries({ color: '#38bdf8', lineWidth: 1 });
-      line.setData(alignLine(bars, cciData));
+      const data = alignLine(bars, cciData);
+      line.setData(data);
+      rememberValues(data);
+      primarySeriesRef.current = line;
       line.createPriceLine({ price: 100, color: '#ef444480', lineWidth: 1, lineStyle: 2, axisLabelVisible: false });
       line.createPriceLine({ price: -100, color: '#22c55e80', lineWidth: 1, lineStyle: 2, axisLabelVisible: false });
     } else if (id === 'willr') {
       const line = chart.addLineSeries({ color: '#f472b6', lineWidth: 1 });
-      line.setData(alignLine(bars, willrData));
+      const data = alignLine(bars, willrData);
+      line.setData(data);
+      rememberValues(data);
+      primarySeriesRef.current = line;
       line.createPriceLine({ price: -20, color: '#ef444480', lineWidth: 1, lineStyle: 2, axisLabelVisible: false });
       line.createPriceLine({ price: -80, color: '#22c55e80', lineWidth: 1, lineStyle: 2, axisLabelVisible: false });
     } else if (id === 'atr') {
       const line = chart.addLineSeries({ color: '#94a3b8', lineWidth: 1 });
-      line.setData(alignLine(bars, atrData));
+      const data = alignLine(bars, atrData);
+      line.setData(data);
+      rememberValues(data);
+      primarySeriesRef.current = line;
     } else if (id === 'obv') {
       const line = chart.addLineSeries({ color: '#2dd4bf', lineWidth: 1 });
-      line.setData(alignLine(bars, obvData));
+      const data = alignLine(bars, obvData);
+      line.setData(data);
+      rememberValues(data);
+      primarySeriesRef.current = line;
     } else {
       const values =
         id === 'adx' ? adxData : id === 'mfi' ? mfiData : id === 'cmf' ? cmfData : rocData;
       const color =
         id === 'adx' ? '#fbbf24' : id === 'mfi' ? '#34d399' : id === 'cmf' ? '#22d3ee' : '#fb7185';
       const line = chart.addLineSeries({ color, lineWidth: 1 });
-      line.setData(alignLine(bars, values));
+      const data = alignLine(bars, values);
+      line.setData(data);
+      rememberValues(data);
+      primarySeriesRef.current = line;
       if (id === 'adx') {
         line.createPriceLine({ price: 25, color: '#fbbf2480', lineWidth: 1, lineStyle: 2, axisLabelVisible: false });
       } else if (id === 'mfi') {
@@ -464,22 +589,18 @@ function IndicatorSlot({
       chart.remove();
       chartRef.current = null;
     };
+    // Recreate only when the bar window identity changes — not on every parent
+    // render that happens to pass a new array reference with the same candles.
     // Height is applied live below — recreating on every drag made panes flicker.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [
     id,
-    bars,
-    macdData,
-    rsiData,
-    stochData,
-    cciData,
-    willrData,
-    atrData,
-    obvData,
-    adxData,
-    mfiData,
-    cmfData,
-    rocData,
+    bars[0]?.symbol,
+    bars[0]?.timestamp,
+    bars[bars.length - 1]?.timestamp,
+    bars[bars.length - 1]?.close,
+    bars[bars.length - 1]?.volume,
+    bars.length,
   ]);
 
   useEffect(() => {
@@ -498,6 +619,27 @@ function IndicatorSlot({
       /* range may be briefly invalid while bars swap */
     }
   }, [visibleRange]);
+
+  useEffect(() => {
+    const chart = chartRef.current;
+    const series = primarySeriesRef.current;
+    if (!chart || !series) return;
+    if (crosshairTime == null) {
+      chart.clearCrosshairPosition();
+      return;
+    }
+    const mapped = valueByTimeRef.current.get(crosshairTime);
+    let price = mapped;
+    if (price == null || !Number.isFinite(price)) {
+      const vr = chart.priceScale('right').getVisibleRange();
+      price = vr ? (vr.from + vr.to) / 2 : 0;
+    }
+    try {
+      chart.setCrosshairPosition(price, crosshairTime as Time, series);
+    } catch {
+      chart.clearCrosshairPosition();
+    }
+  }, [crosshairTime, visibleRange, bars.length]);
 
   return (
     <div className="relative flex shrink-0 flex-col" style={{ height: LABEL_H + height }}>

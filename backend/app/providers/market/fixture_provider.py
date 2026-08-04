@@ -24,7 +24,10 @@ TIMEFRAME_MAP = {
     "5Min": "5m",
     "15Min": "15m",
     "1Hour": "1h",
+    # Yahoo has no native 4h — providers fetch 1h and aggregate.
+    "4Hour": "1h",
     "1Day": "1d",
+    "1Month": "1mo",
 }
 
 DEFAULT_RANGES = {
@@ -32,8 +35,45 @@ DEFAULT_RANGES = {
     "5Min": timedelta(days=30),
     "15Min": timedelta(days=60),
     "1Hour": timedelta(days=180),
+    "4Hour": timedelta(days=365),
     "1Day": timedelta(days=365 * 2),
+    "1Month": timedelta(days=365 * 10),
 }
+
+
+def aggregate_bars(bars: list[Bar], bucket_seconds: int) -> list[Bar]:
+    """OHLCV-aggregate bars into fixed UTC buckets (e.g. 4h from 1h)."""
+    if not bars or bucket_seconds <= 0:
+        return bars
+    buckets: dict[int, list[Bar]] = {}
+    order: list[int] = []
+    for b in bars:
+        ts = b.timestamp
+        if ts.tzinfo is None:
+            ts = ts.replace(tzinfo=timezone.utc)
+        sec = int(ts.timestamp())
+        key = (sec // bucket_seconds) * bucket_seconds
+        if key not in buckets:
+            buckets[key] = []
+            order.append(key)
+        buckets[key].append(b)
+    out: list[Bar] = []
+    for key in order:
+        group = buckets[key]
+        if not group:
+            continue
+        out.append(
+            Bar(
+                symbol=group[0].symbol,
+                timestamp=datetime.fromtimestamp(key, tz=timezone.utc),
+                open=group[0].open,
+                high=max(x.high for x in group),
+                low=min(x.low for x in group),
+                close=group[-1].close,
+                volume=sum(x.volume for x in group),
+            )
+        )
+    return out
 
 
 def load_universe() -> list[dict[str, Any]]:
@@ -97,12 +137,34 @@ def market_status_now() -> MarketStatus:
     return MarketStatus(isOpen=is_open, session=session)
 
 
+# Yahoo caret tickers → local fixture keys (index point levels, not ETF dollars).
+_INDEX_QUOTE_KEYS = {
+    "DJI": "DJI",
+    "^DJI": "DJI",
+    "DJIA": "DJI",
+    "SPX": "SPX",
+    "^GSPC": "SPX",
+    "GSPC": "SPX",
+    "IXIC": "IXIC",
+    "^IXIC": "IXIC",
+    "COMP": "IXIC",
+}
+
+
+def _fixture_quote_key(symbol: str) -> str:
+    raw = (symbol or "").strip().upper()
+    return _INDEX_QUOTE_KEYS.get(raw, raw)
+
+
 def generate_fixture_bars(symbol: str, timeframe: str, limit: int = 300) -> list[Bar]:
     quotes_path = FIXTURE_DIR / "quotes.json"
     base_price = 100.0
+    key = _fixture_quote_key(symbol)
     if quotes_path.exists():
         quotes = json.loads(quotes_path.read_text(encoding="utf-8"))
-        if symbol in quotes:
+        if key in quotes:
+            base_price = float(quotes[key]["price"])
+        elif symbol in quotes:
             base_price = float(quotes[symbol]["price"])
 
     step = {
@@ -110,7 +172,9 @@ def generate_fixture_bars(symbol: str, timeframe: str, limit: int = 300) -> list
         "5Min": timedelta(minutes=5),
         "15Min": timedelta(minutes=15),
         "1Hour": timedelta(hours=1),
+        "4Hour": timedelta(hours=4),
         "1Day": timedelta(days=1),
+        "1Month": timedelta(days=30),
     }.get(timeframe, timedelta(minutes=5))
 
     # Anchor near a fixed demo time so news alignment works
@@ -180,15 +244,45 @@ class FixtureMarketDataProvider:
     async def get_snapshots(self, symbols: list[str]) -> list[Snapshot]:
         quotes = json.loads((FIXTURE_DIR / "quotes.json").read_text(encoding="utf-8"))
         out: list[Snapshot] = []
+        index_names = {"DJI": "道琼斯", "SPX": "标普500", "IXIC": "纳斯达克"}
         for sym in symbols:
-            q = quotes.get(sym.upper())
+            key = _fixture_quote_key(sym)
+            q = quotes.get(key) or quotes.get(sym.upper())
             row = find_universe(sym) or {}
             if not q:
+                # Still emit a synthetic snapshot for known indices / equities.
+                bars = generate_fixture_bars(sym.upper(), "1Day", 30)
+                if not bars:
+                    continue
+                last = bars[-1]
+                prev = bars[-2].close if len(bars) > 1 else last.close
+                change = last.close - prev
+                pct = (change / prev * 100) if prev else 0
+                out.append(
+                    Snapshot(
+                        symbol=sym.upper(),
+                        name=index_names.get(key, row.get("companyName", sym.upper())),
+                        price=last.close,
+                        previousClose=prev,
+                        change=change,
+                        changePercent=pct,
+                        dayHigh=last.high,
+                        dayLow=last.low,
+                        volume=last.volume,
+                        turnover=last.close * last.volume,
+                        marketCap=row.get("marketCap"),
+                        sector=row.get("sector", "Index" if key in index_names else "Unknown"),
+                        assetType="index" if key in index_names else row.get("assetType", "equity"),
+                        indices=list(row.get("indices") or []),
+                        provider=self.name,
+                        timestamp=last.timestamp,
+                    )
+                )
                 continue
             out.append(
                 Snapshot(
                     symbol=sym.upper(),
-                    name=row.get("companyName", sym.upper()),
+                    name=index_names.get(key, row.get("companyName", sym.upper())),
                     price=q["price"],
                     previousClose=q["previousClose"],
                     change=q["change"],
@@ -196,7 +290,11 @@ class FixtureMarketDataProvider:
                     dayHigh=q.get("dayHigh", q["price"]),
                     dayLow=q.get("dayLow", q["price"]),
                     volume=q.get("volume", 0),
-                    sector=row.get("sector", "Unknown"),
+                    turnover=float(q["price"]) * float(q.get("volume", 0)),
+                    marketCap=row.get("marketCap"),
+                    sector=row.get("sector", "Index" if key in index_names else "Unknown"),
+                    assetType="index" if key in index_names else row.get("assetType", "equity"),
+                    indices=list(row.get("indices") or []),
                     provider=self.name,
                     timestamp=parse_dt(q["timestamp"]),
                 )
@@ -205,7 +303,8 @@ class FixtureMarketDataProvider:
 
     async def get_quote(self, symbol: str) -> Quote:
         quotes = json.loads((FIXTURE_DIR / "quotes.json").read_text(encoding="utf-8"))
-        q = quotes.get(symbol.upper())
+        key = _fixture_quote_key(symbol)
+        q = quotes.get(key) or quotes.get(symbol.upper())
         if not q:
             # synthesize from universe
             bars = generate_fixture_bars(symbol.upper(), "5Min", 50)

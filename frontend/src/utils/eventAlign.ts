@@ -15,9 +15,17 @@ export function alignEventToBar(
 
   let aligned: Date;
   switch (timeframe) {
+    case '1Month':
+      aligned = new Date(local.getFullYear(), local.getMonth(), 1, 0, 0, 0, 0);
+      break;
     case '1Day':
       aligned = new Date(local.getFullYear(), local.getMonth(), local.getDate(), 0, 0, 0, 0);
       break;
+    case '4Hour': {
+      const hour = Math.floor(local.getHours() / 4) * 4;
+      aligned = new Date(local.getFullYear(), local.getMonth(), local.getDate(), hour, 0, 0, 0);
+      break;
+    }
     case '1Hour':
       aligned = new Date(local.getFullYear(), local.getMonth(), local.getDate(), local.getHours(), 0, 0, 0);
       break;
@@ -74,8 +82,12 @@ export function timeframeSeconds(timeframe: Timeframe | string): number {
       return 15 * 60;
     case '1Hour':
       return 60 * 60;
+    case '4Hour':
+      return 4 * 60 * 60;
     case '1Day':
       return 24 * 60 * 60;
+    case '1Month':
+      return 30 * 24 * 60 * 60;
     default:
       return 5 * 60;
   }
@@ -85,19 +97,33 @@ export function timeframeSeconds(timeframe: Timeframe | string): number {
  * Approximate the news window (start ISO + item budget) for a ~300-bar chart of the
  * given timeframe, so the news request can fire in parallel with the bars request.
  * Lookback is padded generously (weekends/holidays) so the oldest bar still gets news.
+ *
+ * `start` is quantised to the top of the hour: the value becomes part of the React
+ * Query key and of the backend's window cache key, so a raw `Date.now()` would make
+ * the hover-prefetch and the page query disagree by a few milliseconds and force a
+ * fresh (multi-second) upstream fetch on every single symbol switch.
  */
 export function newsWindowForTimeframe(timeframe: Timeframe | string): {
   start: string;
   limit: number;
 } {
-  const now = Date.now();
+  const hour = 60 * 60 * 1000;
+  const now = Math.floor(Date.now() / hour) * hour;
   const day = 24 * 60 * 60 * 1000;
   let lookbackMs: number;
   let limit: number;
   switch (timeframe) {
+    case '1Month':
+      lookbackMs = 3650 * day; // ~10y
+      limit = 400;
+      break;
     case '1Day':
       lookbackMs = 470 * day; // ~300 trading days
-      limit = 600;
+      limit = 800;
+      break;
+    case '4Hour':
+      lookbackMs = 180 * day;
+      limit = 500;
       break;
     case '1Hour':
       lookbackMs = 75 * day; // ~300 RTH hours
@@ -131,8 +157,8 @@ export function alignPublishedToBucketSec(
   publishedAt: Date | string | number,
   timeframe: Timeframe | string,
 ): number {
-  if (timeframe === '1Day') {
-    return Math.floor(alignEventToBar(publishedAt, '1Day').getTime() / 1000);
+  if (timeframe === '1Day' || timeframe === '1Month') {
+    return Math.floor(alignEventToBar(publishedAt, timeframe).getTime() / 1000);
   }
   const eventSec = Math.floor(
     (publishedAt instanceof Date ? publishedAt : new Date(publishedAt)).getTime() / 1000,

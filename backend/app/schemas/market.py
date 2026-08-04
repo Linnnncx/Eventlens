@@ -66,7 +66,12 @@ class Snapshot(BaseModel):
     day_high: float = Field(default=0, alias="dayHigh")
     day_low: float = Field(default=0, alias="dayLow")
     volume: float = 0
+    # price × volume — Yahoo chart meta has no marketCap for free clients
+    turnover: float = 0
+    market_cap: Optional[float] = Field(default=None, alias="marketCap")
     sector: str = "Unknown"
+    asset_type: str = Field(default="equity", alias="assetType")
+    indices: list[str] = Field(default_factory=list)
     provider: str = "yfinance"
     timestamp: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
 
@@ -123,6 +128,36 @@ class NewsAnalysis(BaseModel):
     model_config = {"populate_by_name": True}
 
 
+class RangeAnalysisRequest(BaseModel):
+    symbol: str
+    timeframe: str = "1Day"
+    start: datetime
+    end: datetime
+
+    model_config = {"populate_by_name": True}
+
+
+class RangeAnalysisReport(BaseModel):
+    symbol: str
+    timeframe: str
+    start: datetime
+    end: datetime
+    title: str
+    summary_zh: str = Field(alias="summaryZh")
+    technical_summary: str = Field(alias="technicalSummary")
+    news_summary: str = Field(alias="newsSummary")
+    outlook: str
+    key_points: list[str] = Field(default_factory=list, alias="keyPoints")
+    risks: list[str] = Field(default_factory=list)
+    bar_count: int = Field(alias="barCount")
+    news_count: int = Field(alias="newsCount")
+    model: str
+    used_llm: bool = Field(alias="usedLlm")
+    disclaimer: str = "以上分析仅供参考，不构成投资建议或买卖指令。"
+
+    model_config = {"populate_by_name": True}
+
+
 class RiskSummary(BaseModel):
     summary: str
     risk_level: Literal["low", "medium", "high"] = Field(alias="riskLevel")
@@ -143,6 +178,28 @@ class BarsResponse(BaseModel):
 
 class QuoteResponse(BaseModel):
     quote: Quote
+    meta: ProviderMeta
+
+
+class OrderBookLevel(BaseModel):
+    price: float
+    size: float
+    orders: int = 1
+
+
+class OrderBook(BaseModel):
+    symbol: str
+    bids: list[OrderBookLevel]
+    asks: list[OrderBookLevel]
+    mid: float
+    spread: float
+    timestamp: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+    synthetic: bool = True
+    provider: str = "synthetic"
+
+
+class OrderBookResponse(BaseModel):
+    book: OrderBook
     meta: ProviderMeta
 
 

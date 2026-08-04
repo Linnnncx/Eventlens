@@ -47,7 +47,7 @@ class Settings(BaseSettings):
     alpaca_api_secret: str = ""
     alpaca_feed: str = "iex"
 
-    llm_provider: Literal["rules", "deepseek"] = "rules"
+    llm_provider: Literal["rules", "openai", "deepseek", "qwen"] = "rules"
     deepseek_api_key: str = ""
     deepseek_base_url: str = "https://api.deepseek.com"
     deepseek_model: str = "deepseek-v4-flash"

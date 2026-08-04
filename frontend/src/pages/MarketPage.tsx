@@ -24,8 +24,11 @@ import {
   sessionLabel,
 } from '../utils/format';
 import { useEffect } from 'react';
+import { INDEX_STRIP } from '../features/market/indices';
+import { MoverHeatmaps } from '../features/market/MoverHeatmaps';
 
-const INDEX_ETFS = ['SPY', 'QQQ', 'DIA', 'IWM'];
+const INDEX_SYMBOLS = INDEX_STRIP.map((i) => i.symbol);
+const HEATMAP_TOP_N = 8;
 
 export function MarketPage() {
   const setPortfolio = useAccountStore((s) => s.setPortfolio);
@@ -58,7 +61,13 @@ export function MarketPage() {
 
   const watchSymbols = watchlist?.items ?? [];
   const coreMovers = (coreSymbols?.items ?? []).slice(0, 8).map((s) => s.symbol);
-  const allSymbols = [...new Set([...INDEX_ETFS, ...coreMovers, ...watchSymbols])];
+  const heatPool = (coreSymbols?.items ?? [])
+    .filter((s) => (s.assetType || 'equity') === 'equity')
+    .slice(0, 48)
+    .map((s) => s.symbol);
+  const allSymbols = [
+    ...new Set([...INDEX_SYMBOLS, ...heatPool, ...coreMovers, ...watchSymbols]),
+  ];
 
   const { data: snapshots } = useQuery({
     queryKey: ['snapshots', allSymbols.join(',')],
@@ -80,17 +89,42 @@ export function MarketPage() {
   const getPrice = (sym: string) => quotes[sym]?.price ?? snapMap.get(sym)?.price ?? 0;
   const getChange = (sym: string) => snapMap.get(sym)?.changePercent ?? 0;
 
+  const heatCells = heatPool
+    .map((sym) => {
+      const snap = snapMap.get(sym);
+      return {
+        symbol: sym,
+        name: snap?.name ?? sym,
+        changePercent: snap?.changePercent ?? 0,
+        price: getPrice(sym),
+      };
+    })
+    .filter((c) => Number.isFinite(c.changePercent));
+
+  const gainers = [...heatCells]
+    .filter((c) => c.changePercent > 0)
+    .sort((a, b) => b.changePercent - a.changePercent)
+    .slice(0, HEATMAP_TOP_N);
+  const losers = [...heatCells]
+    .filter((c) => c.changePercent < 0)
+    .sort((a, b) => a.changePercent - b.changePercent)
+    .slice(0, HEATMAP_TOP_N);
+
   return (
-    <div className="mx-auto flex w-full max-w-[1600px] flex-col gap-6 p-4 pb-8">
-      <section className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
+    <div className="mx-auto flex w-full max-w-[1600px] flex-col gap-7 p-5 pb-10 md:p-6">
+      <section className="flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
         <div>
-          <div className="mb-1 flex items-center gap-2">
-            <Activity className="h-6 w-6 text-primary" />
-            <h1 className="text-xl font-semibold tracking-tight">EventLens Market</h1>
+          <div className="mb-1.5 flex items-center gap-2.5">
+            <span className="flex h-10 w-10 items-center justify-center rounded-xl bg-primary/15 ring-1 ring-primary/25">
+              <Activity className="h-5 w-5 text-primary" />
+            </span>
+            <h1 className="text-2xl font-semibold tracking-tight text-gray-50">EventLens Market</h1>
           </div>
-          <p className="text-sm text-muted">Event-driven market intelligence &amp; paper trading</p>
+          <p className="text-sm text-muted md:text-[15px]">
+            Event-driven market intelligence &amp; paper trading
+          </p>
         </div>
-        <div className="w-full md:max-w-sm">
+        <div className="w-full md:max-w-md">
           <SearchBox autoFocus />
         </div>
       </section>
@@ -124,23 +158,29 @@ export function MarketPage() {
       </section>
 
       <section>
-        <h2 className="mb-2 text-xs font-medium uppercase tracking-wide text-muted">Index ETFs</h2>
-        <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
-          {INDEX_ETFS.map((sym) => (
+        <h2 className="mb-2.5 text-sm font-medium tracking-wide text-muted">指数</h2>
+        <div className="grid grid-cols-1 gap-2 sm:grid-cols-3">
+          {INDEX_STRIP.map((idx) => (
             <SymbolCard
-              key={sym}
-              symbol={sym}
-              name={snapMap.get(sym)?.name ?? sym}
-              price={getPrice(sym)}
-              changePercent={getChange(sym)}
+              key={idx.symbol}
+              symbol={idx.symbol}
+              name={idx.label}
+              price={getPrice(idx.symbol)}
+              changePercent={getChange(idx.symbol)}
+              titleFirst
             />
           ))}
         </div>
       </section>
 
+      <section>
+        <h2 className="mb-2.5 text-sm font-medium tracking-wide text-muted">今日涨跌热点</h2>
+        <MoverHeatmaps gainers={gainers} losers={losers} />
+      </section>
+
       <div className="grid gap-6 lg:grid-cols-2">
         <section>
-          <h2 className="mb-2 text-xs font-medium uppercase tracking-wide text-muted">Core Movers</h2>
+          <h2 className="mb-2.5 text-sm font-medium tracking-wide text-muted">Core Movers</h2>
           <div className="card divide-y divide-border">
             {coreMovers.length === 0 ? (
               <EmptyState title="No core symbols" />
@@ -159,8 +199,8 @@ export function MarketPage() {
         </section>
 
         <section>
-          <h2 className="mb-2 flex items-center gap-1 text-xs font-medium uppercase tracking-wide text-muted">
-            <Star className="h-3 w-3" /> Watchlist
+          <h2 className="mb-2.5 flex items-center gap-1.5 text-sm font-medium tracking-wide text-muted">
+            <Star className="h-3.5 w-3.5" /> Watchlist
           </h2>
           <div className="card divide-y divide-border">
             {watchSymbols.length === 0 ? (
@@ -182,7 +222,7 @@ export function MarketPage() {
 
       <div className="grid gap-6 lg:grid-cols-2">
         <section>
-          <h2 className="mb-2 text-xs font-medium uppercase tracking-wide text-muted">Positions</h2>
+          <h2 className="mb-2.5 text-sm font-medium tracking-wide text-muted">Positions</h2>
           <div className="card divide-y divide-border">
             {!portfolio?.positions.length ? (
               <EmptyState title="No open positions" />
@@ -210,7 +250,7 @@ export function MarketPage() {
         </section>
 
         <section>
-          <h2 className="mb-2 text-xs font-medium uppercase tracking-wide text-muted">Recent Orders</h2>
+          <h2 className="mb-2.5 text-sm font-medium tracking-wide text-muted">Recent Orders</h2>
           <div className="card divide-y divide-border">
             {!orders?.items.length ? (
               <EmptyState title="No orders yet" />
@@ -250,13 +290,13 @@ function StatCard({
   icon?: ReactNode;
 }) {
   return (
-    <div className="card px-4 py-3">
+    <div className="card px-4 py-4 transition-colors hover:bg-surface-hover/40">
       <div className="flex items-center justify-between">
-        <span className="text-xs text-muted">{label}</span>
+        <span className="text-sm text-muted">{label}</span>
         {icon}
       </div>
-      <div className="mt-1 tabular text-lg font-semibold">{value}</div>
-      {sub && <div className={`mt-0.5 text-xs tabular ${subClass ?? 'text-muted'}`}>{sub}</div>}
+      <div className="mt-1.5 tabular text-xl font-semibold tracking-tight text-gray-50">{value}</div>
+      {sub && <div className={`mt-1 text-sm tabular ${subClass ?? 'text-muted'}`}>{sub}</div>}
     </div>
   );
 }
@@ -266,25 +306,34 @@ function SymbolCard({
   name,
   price,
   changePercent,
+  titleFirst = false,
 }: {
   symbol: string;
   name: string;
   price: number;
   changePercent: number;
+  /** Show Chinese/index name first (e.g. 道琼斯) with ticker as secondary. */
+  titleFirst?: boolean;
 }) {
   return (
     <Link
       to={`/workbench/${symbol}`}
-      className="card px-3 py-2.5 transition-colors hover:bg-surface-hover"
+      className="card px-3.5 py-3 transition-colors hover:bg-surface-hover"
     >
       <div className="flex items-center justify-between">
-        <span className="font-semibold">{symbol}</span>
-        <ArrowUpRight className="h-3.5 w-3.5 text-muted" />
+        <span className="text-base font-semibold">{titleFirst ? name : symbol}</span>
+        <ArrowUpRight className="h-4 w-4 text-muted" />
       </div>
-      <div className="truncate text-[10px] text-muted">{name}</div>
-      <div className="mt-1 flex items-baseline justify-between">
-        <PriceFlash value={price} className="text-sm font-medium" />
-        <span className={`text-xs tabular ${changeColorClass(changePercent)}`}>
+      <div className="truncate text-xs text-muted">{titleFirst ? symbol : name}</div>
+      <div className="mt-1.5 flex items-baseline justify-between">
+        <PriceFlash
+          value={price}
+          formatter={(v) =>
+            v.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
+          }
+          className="text-base font-medium"
+        />
+        <span className={`text-sm tabular ${changeColorClass(changePercent)}`}>
           {formatPercent(changePercent)}
         </span>
       </div>
@@ -306,15 +355,15 @@ function SymbolRow({
   return (
     <Link
       to={`/workbench/${symbol}`}
-      className="flex items-center justify-between px-3 py-2.5 hover:bg-surface-hover"
+      className="flex items-center justify-between px-3.5 py-3 transition-colors hover:bg-surface-hover"
     >
       <div className="min-w-0">
-        <span className="font-medium">{symbol}</span>
-        <span className="ml-2 truncate text-xs text-muted">{name}</span>
+        <span className="text-[15px] font-medium">{symbol}</span>
+        <span className="ml-2 truncate text-sm text-muted">{name}</span>
       </div>
       <div className="text-right">
-        <PriceFlash value={price} className="text-sm" />
-        <div className={`text-xs tabular ${changeColorClass(changePercent)}`}>
+        <PriceFlash value={price} className="text-[15px]" />
+        <div className={`text-sm tabular ${changeColorClass(changePercent)}`}>
           {formatPercent(changePercent)}
         </div>
       </div>

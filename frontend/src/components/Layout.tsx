@@ -8,22 +8,29 @@ export function Layout() {
 
   return (
     <div className="flex min-h-full flex-col">
-      <header className="sticky top-0 z-40 border-b border-border bg-surface/95 backdrop-blur">
-        <div className="flex h-12 w-full items-center justify-between px-4">
-          <Link to="/" className="flex items-center gap-2 font-semibold tracking-tight">
-            <Activity className="h-5 w-5 text-primary" strokeWidth={2.5} />
-            <span>EventLens</span>
+      <header className="sticky top-0 z-40 border-b border-border/80 bg-surface/80 backdrop-blur-md">
+        <div className="flex w-full items-center justify-between px-4 py-2.5 md:px-5">
+          <Link
+            to="/"
+            className="group flex items-center gap-2.5 font-semibold tracking-tight text-gray-50"
+          >
+            <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-primary/15 ring-1 ring-primary/30 transition-colors group-hover:bg-primary/25">
+              <Activity className="h-4 w-4 text-primary" strokeWidth={2.5} />
+            </span>
+            <span className="text-base">EventLens</span>
           </Link>
-          <nav className="flex items-center gap-4 text-sm">
+          <nav className="flex items-center gap-5 text-sm">
             <Link
               to="/"
-              className={location.pathname === '/' ? 'text-primary' : 'text-muted hover:text-gray-100'}
+              className={
+                location.pathname === '/'
+                  ? 'font-medium text-primary'
+                  : 'text-muted transition-colors hover:text-gray-100'
+              }
             >
               Market
             </Link>
-            {isWorkbench && (
-              <span className="text-muted">/ Workbench</span>
-            )}
+            {isWorkbench && <span className="text-muted/80">/ Workbench</span>}
             <ProviderBadge />
           </nav>
         </div>

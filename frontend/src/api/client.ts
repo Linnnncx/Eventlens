@@ -1,4 +1,4 @@
-const API_BASE = import.meta.env.VITE_API_BASE ?? '/api';
+const API_BASE = import.meta.env.VITE_API_BASE || '/api';
 
 export class ApiError extends Error {
   constructor(
@@ -17,7 +17,11 @@ async function parseJson<T>(res: Response): Promise<T> {
   return JSON.parse(text) as T;
 }
 
-export async function apiGet<T>(path: string, params?: Record<string, string | number | boolean | undefined>): Promise<T> {
+export async function apiGet<T>(
+  path: string,
+  params?: Record<string, string | number | boolean | undefined>,
+  signal?: AbortSignal,
+): Promise<T> {
   const url = new URL(`${API_BASE}${path}`, window.location.origin);
   if (params) {
     for (const [key, value] of Object.entries(params)) {
@@ -28,6 +32,7 @@ export async function apiGet<T>(path: string, params?: Record<string, string | n
   }
   const res = await fetch(url.toString(), {
     headers: { Accept: 'application/json' },
+    signal,
   });
   if (!res.ok) {
     const body = await parseJson<unknown>(res).catch(() => undefined);
@@ -39,6 +44,22 @@ export async function apiGet<T>(path: string, params?: Record<string, string | n
 export async function apiPost<T>(path: string, body?: unknown): Promise<T> {
   const res = await fetch(`${API_BASE}${path}`, {
     method: 'POST',
+    headers: {
+      Accept: 'application/json',
+      'Content-Type': 'application/json',
+    },
+    body: body !== undefined ? JSON.stringify(body) : undefined,
+  });
+  if (!res.ok) {
+    const errBody = await parseJson<unknown>(res).catch(() => undefined);
+    throw new ApiError(res.statusText || 'Request failed', res.status, errBody);
+  }
+  return parseJson<T>(res);
+}
+
+export async function apiPut<T>(path: string, body?: unknown): Promise<T> {
+  const res = await fetch(`${API_BASE}${path}`, {
+    method: 'PUT',
     headers: {
       Accept: 'application/json',
       'Content-Type': 'application/json',

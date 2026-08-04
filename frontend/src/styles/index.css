@@ -7,19 +7,29 @@
     @apply border-border;
   }
 
+  html {
+    font-size: 15px;
+  }
+
   html,
   body,
   #root {
-    @apply h-full min-h-screen bg-surface text-gray-100;
+    @apply h-full min-h-screen text-gray-100 antialiased;
+    background-color: #0a0c10;
+    background-image:
+      radial-gradient(1200px 600px at 10% -10%, rgba(59, 130, 246, 0.08), transparent 55%),
+      radial-gradient(900px 500px at 90% 0%, rgba(167, 139, 250, 0.06), transparent 50%),
+      linear-gradient(180deg, #0c1018 0%, #0a0c10 40%, #090b0f 100%);
+    background-attachment: fixed;
   }
 
   ::-webkit-scrollbar {
-    width: 6px;
-    height: 6px;
+    width: 8px;
+    height: 8px;
   }
 
   ::-webkit-scrollbar-track {
-    @apply bg-surface;
+    @apply bg-transparent;
   }
 
   ::-webkit-scrollbar-thumb {
@@ -29,19 +39,27 @@
   ::-webkit-scrollbar-thumb:hover {
     @apply bg-muted;
   }
+
+  ::selection {
+    background: rgba(59, 130, 246, 0.35);
+    color: #f8fafc;
+  }
 }
 
 @layer components {
   .card {
-    @apply rounded-lg border border-border bg-surface-card;
+    @apply rounded-xl border border-border/90 bg-surface-card/95 backdrop-blur-sm;
+    box-shadow:
+      0 1px 0 rgba(255, 255, 255, 0.03) inset,
+      0 8px 24px rgba(0, 0, 0, 0.28);
   }
 
   .btn {
-    @apply inline-flex items-center justify-center gap-2 rounded-md px-3 py-1.5 text-sm font-medium transition-colors disabled:cursor-not-allowed disabled:opacity-50;
+    @apply inline-flex items-center justify-center gap-2 rounded-lg px-3 py-2 text-sm font-medium transition-all duration-150 disabled:cursor-not-allowed disabled:opacity-50;
   }
 
   .btn-primary {
-    @apply btn bg-primary text-white hover:bg-primary-dim;
+    @apply btn bg-primary text-white shadow-sm hover:bg-primary-dim hover:shadow-md;
   }
 
   .btn-ghost {
@@ -49,19 +67,19 @@
   }
 
   .btn-buy {
-    @apply btn bg-up/15 text-up hover:bg-up/25;
+    @apply btn bg-up/15 text-up ring-1 ring-inset ring-up/20 hover:bg-up/25;
   }
 
   .btn-sell {
-    @apply btn bg-down/15 text-down hover:bg-down/25;
+    @apply btn bg-down/15 text-down ring-1 ring-inset ring-down/20 hover:bg-down/25;
   }
 
   .input {
-    @apply w-full rounded-md border border-border bg-surface-raised px-3 py-2 text-sm text-gray-100 placeholder:text-muted focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary;
+    @apply w-full rounded-lg border border-border bg-surface-raised px-3 py-2.5 text-sm text-gray-100 placeholder:text-muted/80 transition-colors focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/30;
   }
 
   .badge {
-    @apply inline-flex items-center rounded px-1.5 py-0.5 text-xs font-medium;
+    @apply inline-flex items-center rounded-md px-1.5 py-0.5 text-xs font-medium;
   }
 
   .badge-up {
@@ -79,9 +97,152 @@
   .tabular {
     font-variant-numeric: tabular-nums;
   }
+
+  .panel-header {
+    @apply border-b border-border/80 bg-surface-raised/80 px-3 py-2 text-sm font-medium text-gray-200;
+  }
+
+  .seg-control {
+    @apply flex gap-1 rounded-lg border border-border bg-surface-raised p-1;
+  }
+
+  .seg-btn {
+    @apply flex-1 rounded-md px-2.5 py-2 text-sm font-medium transition-colors;
+  }
+
+  .seg-btn-active {
+    @apply bg-surface-card text-gray-100 shadow-sm;
+  }
+
+  .seg-btn-idle {
+    @apply text-muted hover:text-gray-200;
+  }
+
+  /* Hide native number spinners when custom nudge controls are used */
+  .no-spinner {
+    -moz-appearance: textfield;
+  }
+  .no-spinner::-webkit-outer-spin-button,
+  .no-spinner::-webkit-inner-spin-button {
+    -webkit-appearance: none;
+    margin: 0;
+  }
+
+  /* ---- Mobile shell ---- */
+
+  /* Notch / home-indicator padding */
+  .safe-bottom {
+    padding-bottom: max(env(safe-area-inset-bottom), 0.5rem);
+  }
+  .safe-top {
+    padding-top: env(safe-area-inset-top);
+  }
+
+  .no-scrollbar {
+    -ms-overflow-style: none;
+    scrollbar-width: none;
+  }
+  .no-scrollbar::-webkit-scrollbar {
+    display: none;
+  }
+
+  /* Chart / carousel areas must not trigger browser pull-to-refresh */
+  .touch-pan-lock {
+    touch-action: none;
+    overscroll-behavior: contain;
+  }
+
+  .m-sheet {
+    @apply fixed inset-x-0 bottom-0 z-50 flex max-h-[92vh] flex-col rounded-t-2xl border-t border-border bg-surface-card;
+    box-shadow: 0 -12px 40px rgba(0, 0, 0, 0.5);
+    animation: sheet-up 0.22s cubic-bezier(0.22, 1, 0.36, 1);
+  }
+
+  .m-tap {
+    @apply active:scale-[0.98] active:opacity-80;
+    -webkit-tap-highlight-color: transparent;
+  }
 }
 
-/* Hide Lightweight Charts attribution so it doesn't clip the last indicator pane */
-.indicator-chart-host a[href*="tradingview.com"] {
+@keyframes sheet-up {
+  from {
+    transform: translateY(100%);
+  }
+  to {
+    transform: translateY(0);
+  }
+}
+
+/* Hide Lightweight Charts / TradingView attribution on all chart hosts */
+a[href*="tradingview.com"] {
   display: none !important;
+}
+
+/* Workbench live danmaku lane */
+@keyframes danmaku-fly {
+  0% {
+    transform: translateX(0);
+    opacity: 0;
+  }
+  6% {
+    opacity: 1;
+  }
+  92% {
+    opacity: 1;
+  }
+  100% {
+    transform: translateX(calc(-100% - 105cqi));
+    opacity: 0;
+  }
+}
+
+@keyframes danmaku-bubble {
+  0% {
+    transform: translateY(120%) scale(0.55);
+    opacity: 0;
+  }
+  14% {
+    transform: translateY(-8%) scale(1.06);
+    opacity: 1;
+  }
+  22% {
+    transform: translateY(0) scale(1);
+    opacity: 1;
+  }
+  100% {
+    transform: translateX(calc(-100% - 90cqi)) translateY(0) scale(1);
+    opacity: 0;
+  }
+}
+
+.danmaku-stage {
+  container-type: inline-size;
+}
+
+.danmaku-fly {
+  left: 100%;
+  animation-name: danmaku-fly;
+  animation-timing-function: linear;
+  animation-fill-mode: forwards;
+  animation-duration: var(--danmaku-duration, 10s);
+}
+
+.danmaku-bubble {
+  left: 72%;
+  animation-name: danmaku-bubble;
+  animation-timing-function: cubic-bezier(0.22, 1, 0.36, 1);
+  animation-fill-mode: forwards;
+  animation-duration: calc(var(--danmaku-duration, 10s) + 0.9s);
+}
+
+.danmaku-chip {
+  will-change: transform, opacity;
+  max-width: min(22rem, 70vw);
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+/* Skip layout/paint work for off-screen screener rows without changing scrolling semantics. */
+.screener-row {
+  content-visibility: auto;
+  contain-intrinsic-size: 44px;
 }

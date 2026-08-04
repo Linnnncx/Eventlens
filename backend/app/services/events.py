@@ -12,8 +12,13 @@ def align_event_to_bar(timestamp: datetime, timeframe: str, tz_name: str = "Amer
     if timestamp.tzinfo is None:
         timestamp = timestamp.replace(tzinfo=timezone.utc)
     local = timestamp.astimezone(ZoneInfo(tz_name))
-    if timeframe == "1Day":
+    if timeframe == "1Month":
+        aligned = local.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
+    elif timeframe == "1Day":
         aligned = local.replace(hour=0, minute=0, second=0, microsecond=0)
+    elif timeframe == "4Hour":
+        hour = (local.hour // 4) * 4
+        aligned = local.replace(hour=hour, minute=0, second=0, microsecond=0)
     elif timeframe == "1Hour":
         aligned = local.replace(minute=0, second=0, microsecond=0)
     elif timeframe == "15Min":

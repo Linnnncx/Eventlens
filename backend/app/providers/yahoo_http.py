@@ -62,6 +62,34 @@ def yahoo_get(url: str, params: dict[str, Any] | None = None, timeout: float | N
     return resp
 
 
+# Friendly UI tickers → Yahoo chart symbols (indices need a leading ^).
+_YAHOO_SYMBOL_ALIASES: dict[str, str] = {
+    "DJI": "^DJI",
+    "DJIA": "^DJI",
+    "DOW": "^DJI",
+    "SPX": "^GSPC",
+    "GSPC": "^GSPC",
+    "SP500": "^GSPC",
+    "IXIC": "^IXIC",
+    "COMP": "^IXIC",
+    "NASDAQ": "^IXIC",
+    "NDX": "^IXIC",
+}
+
+
+def resolve_yahoo_symbol(symbol: str) -> str:
+    """Map UI tickers (DJI/SPX/IXIC) onto Yahoo's caret index symbols."""
+    raw = (symbol or "").strip().upper()
+    if raw.startswith("%5E"):
+        raw = "^" + raw[3:]
+    return _YAHOO_SYMBOL_ALIASES.get(raw, raw)
+
+
+def is_index_symbol(symbol: str) -> bool:
+    resolved = resolve_yahoo_symbol(symbol)
+    return resolved.startswith("^") or resolved in {"DJI", "SPX", "IXIC", "DJIA", "GSPC", "COMP", "NDX"}
+
+
 def fetch_chart(
     symbol: str,
     *,
@@ -70,7 +98,9 @@ def fetch_chart(
     period2: datetime | None = None,
     range_: str | None = None,
 ) -> dict[str, Any]:
-    symbol = symbol.upper()
+    from urllib.parse import quote
+
+    symbol = resolve_yahoo_symbol(symbol)
     params: dict[str, Any] = {
         "interval": interval,
         # US equities: regular session only (not 24h). Extended hours confuse Min/Hour charts.
@@ -85,7 +115,9 @@ def fetch_chart(
         params["period1"] = int(start.timestamp())
         params["period2"] = int(end.timestamp())
 
-    resp = yahoo_get(f"https://query2.finance.yahoo.com/v8/finance/chart/{symbol}", params=params)
+    # Carets must be percent-encoded in the path (`^DJI` → `%5EDJI`).
+    path_sym = quote(symbol, safe="")
+    resp = yahoo_get(f"https://query2.finance.yahoo.com/v8/finance/chart/{path_sym}", params=params)
     data = resp.json()
     result = (data.get("chart") or {}).get("result") or []
     if not result:
@@ -239,6 +271,36 @@ _TICKER_ALIASES: dict[str, list[str]] = {
     "GOOGL": ["google", "alphabet", "youtube", "gemini"],
     "GOOG": ["google", "alphabet", "youtube", "gemini"],
 }
+
+
+@lru_cache(maxsize=512)
+def company_name_for(symbol: str) -> str | None:
+    """Company name for a ticker, local universe first, Yahoo search as fallback.
+
+    Without a name the only news alias is the raw ticker, and most headlines say
+    "Palantir" rather than "PLTR" — so any symbol outside the bundled universe would
+    otherwise have nearly all of its news filtered out as irrelevant.
+    """
+    from app.providers.market.fixture_provider import find_universe
+
+    symbol = symbol.upper()
+    row = find_universe(symbol) or {}
+    if row.get("companyName"):
+        return str(row["companyName"])
+    try:
+        data = yahoo_get(
+            "https://query2.finance.yahoo.com/v1/finance/search",
+            params={"q": symbol, "quotesCount": 5, "newsCount": 0},
+        ).json()
+    except Exception:
+        return None
+    for item in data.get("quotes") or []:
+        if str(item.get("symbol") or "").upper() != symbol:
+            continue
+        name = item.get("shortname") or item.get("longname")
+        if name:
+            return str(name)
+    return None
 
 
 def _symbol_aliases(symbol: str, company_name: str | None) -> list[str]:

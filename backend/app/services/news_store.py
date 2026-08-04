@@ -5,7 +5,7 @@ rate-limited, so news is persisted once and served from the DB afterwards:
 
 - first visit for a symbol/window: fetch upstream, store, return
 - later visits: return from SQLite immediately (milliseconds)
-- if the stored copy is older than REFRESH_AFTER, refresh in the background so the
+- if the stored copy exceeds the configured refresh interval, update it in the background so the
   user still gets an instant response
 
 A per-symbol lock collapses concurrent requests into a single upstream fetch, which
@@ -21,16 +21,19 @@ from datetime import datetime, timedelta, timezone
 from sqlalchemy import and_
 
 from app.database.session import NewsEventRow, NewsSyncRow, SessionLocal
+from app.core.config import get_settings
 from app.providers.factory import provider_factory
 from app.providers.market.fixture_provider import content_hash
+from app.providers.news.google_news import even_sample
 from app.schemas.market import NewsItem
+from app.services.news_classify import classify_headline
 
 logger = logging.getLogger(__name__)
 
 # Serve from DB and refresh in the background once the copy is older than this
-REFRESH_AFTER = timedelta(minutes=15)
 # Treat stored coverage as good enough if it reaches within this much of the request
 COVERAGE_SLACK = timedelta(days=3)
+RECENT_REFRESH_WINDOW = timedelta(days=2)
 
 _locks: dict[str, asyncio.Lock] = {}
 # Hold strong references so background refreshes aren't garbage collected mid-flight
@@ -52,6 +55,13 @@ def _aware(dt: datetime | None) -> datetime | None:
 
 
 def row_to_item(row: NewsEventRow) -> NewsItem:
+    rule_event_type, rule_importance, rule_direction = classify_headline(
+        row.headline,
+        row.summary_original,
+    )
+    # A user-requested AI analysis is authoritative. Otherwise classify cached
+    # rows with the latest deterministic model so rule improvements apply at once.
+    ai_classified = bool(row.summary_ai)
     return NewsItem(
         id=row.id,
         headline=row.headline,
@@ -61,9 +71,9 @@ def row_to_item(row: NewsEventRow) -> NewsItem:
         url=row.url,
         publishedAt=_aware(row.published_at),
         symbols=[row.symbol],
-        eventType=row.event_type,
-        importance=row.importance,
-        direction=row.direction,
+        eventType=row.event_type if ai_classified else rule_event_type,
+        importance=row.importance if ai_classified else rule_importance,
+        direction=row.direction if ai_classified else rule_direction,
         timeHorizon=row.time_horizon,
         provider=row.provider,
     )
@@ -81,7 +91,12 @@ def load_from_db(
         q = q.filter(NewsEventRow.published_at >= start)
     if end:
         q = q.filter(NewsEventRow.published_at <= end)
-    rows = q.order_by(NewsEventRow.published_at.desc()).limit(limit).all()
+    rows = q.order_by(NewsEventRow.published_at.desc()).all()
+    if len(rows) > limit:
+        # Keeping only the newest `limit` rows strips every anchor off the left
+        # half of the chart once a symbol accumulates more news than the budget.
+        # Sample evenly instead so the whole visible window stays covered.
+        rows = even_sample(rows, limit)
     return [row_to_item(r) for r in rows]
 
 
@@ -218,14 +233,24 @@ async def get_news_window(
     covered = sync is not None and (
         start is None or (_aware(sync.covered_from) or now) <= start + COVERAGE_SLACK
     )
-    stale = sync is None or (now - (_aware(sync.fetched_at) or now)) > REFRESH_AFTER
+    refresh_after = timedelta(seconds=max(60, get_settings().yfinance_news_refresh_seconds))
+    stale = sync is None or (now - (_aware(sync.fetched_at) or now)) > refresh_after
 
     # Fast path: anything already in SQLite for this window
     cached_items = load_from_db(db, symbol, start, end, limit)
     if cached_items:
-        needs_refresh = stale or not covered
-        if needs_refresh:
-            task = asyncio.create_task(_refresh(symbol, start, end, limit))
+        if stale or not covered:
+            # Missing historical coverage still needs the requested full window.
+            # Routine freshness updates only fetch the latest two days so a daily
+            # chart does not repeat twelve historical RSS requests every few minutes.
+            incremental_refresh = covered and (end is None or end >= now - RECENT_REFRESH_WINDOW)
+            refresh_start = (
+                max(start or (now - RECENT_REFRESH_WINDOW), now - RECENT_REFRESH_WINDOW)
+                if incremental_refresh
+                else start
+            )
+            refresh_limit = limit if not covered else min(limit, 120)
+            task = asyncio.create_task(_refresh(symbol, refresh_start, end, refresh_limit))
             _background_tasks.add(task)
             task.add_done_callback(_background_tasks.discard)
         return cached_items, "sqlite", True

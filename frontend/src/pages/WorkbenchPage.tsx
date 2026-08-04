@@ -1,4 +1,4 @@
-import { keepPreviousData, useQuery, useQueryClient } from '@tanstack/react-query';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import type { LogicalRange } from 'lightweight-charts';
 import {
   ArrowLeft,
@@ -7,7 +7,7 @@ import {
   Star,
   StarOff,
 } from 'lucide-react';
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
 import {
   addToWatchlist,
@@ -16,10 +16,10 @@ import {
   fetchOrders,
   fetchPortfolio,
   fetchQuote,
+  fetchTrades,
   fetchWatchlist,
   removeFromWatchlist,
 } from '../api/endpoints';
-import { SearchBox } from '../components/SearchBox';
 import { PriceFlash } from '../components/PriceFlash';
 import { EmptyState } from '../components/EmptyState';
 import { ErrorBoundary } from '../components/ErrorBoundary';
@@ -32,23 +32,34 @@ import { indexNewsByBar, visibleNewsForBars } from '../features/chart/newsAnchor
 import { IndicatorPane } from '../features/chart/IndicatorPane';
 import {
   loadMainIndicators,
+  loadMaPeriods,
   loadSubIndicators,
   saveMainIndicators,
+  saveMaPeriods,
   saveSubIndicators,
   type MainIndicatorId,
   type SubIndicatorId,
 } from '../features/chart/indicatorConfig';
+import { IndexStrip } from '../features/market/IndexStrip';
+import { isIndexSymbol } from '../features/market/indices';
+import { StockScreener } from '../features/market/StockScreener';
 import { NewsPanel } from '../features/news/NewsPanel';
-import { TradePanel } from '../features/trading/TradePanel';
+import { RangeAiAnalysis } from '../features/news/RangeAiAnalysis';
+import { OrderBook } from '../features/trading/OrderBook';
+import { QuickOrderBox } from '../features/trading/QuickOrderBox';
+import {
+  OrdersTable,
+  PositionsTable,
+  TradesTable,
+} from '../features/trading/TradingTables';
 import { TradeSheet } from '../features/trading/TradeSheet';
 import { useMarketSocket } from '../hooks/useMarketSocket';
 import { useAccountStore } from '../stores/accountStore';
 import { useWorkbenchStore } from '../stores/workbenchStore';
-import type { NewsItem, Order, Position, Timeframe } from '../types/api';
+import type { Bar, NewsItem, Timeframe } from '../types/api';
 import {
   changeColorClass,
   formatCompact,
-  formatCurrency,
   formatPercent,
   formatMarketTime,
   marketSessionOf,
@@ -56,8 +67,23 @@ import {
   marketSessionClass,
 } from '../utils/format';
 import { newsWindowForTimeframe, timeframeSeconds } from '../utils/eventAlign';
+import {
+  computeEventReactionLocal,
+  formatReactionPct,
+  formatReactionRatio,
+} from '../utils/eventReaction';
+import { assignRelatedNewsImages } from '../utils/relatedNewsImage';
 
-const TIMEFRAMES: Timeframe[] = ['1Min', '5Min', '15Min', '1Hour', '1Day'];
+const TIMEFRAMES: Timeframe[] = ['1Min', '5Min', '15Min', '1Hour', '4Hour', '1Day', '1Month'];
+const EMPTY_BARS: Bar[] = [];
+const EMPTY_NEWS: NewsItem[] = [];
+
+function barsRefreshInterval(timeframe: Timeframe): number {
+  if (timeframe === '1Min') return 30_000;
+  if (timeframe === '5Min' || timeframe === '15Min') return 60_000;
+  if (timeframe === '1Hour' || timeframe === '4Hour') return 5 * 60_000;
+  return 15 * 60_000;
+}
 
 type BottomTab = 'news' | 'positions' | 'orders' | 'trades';
 
@@ -67,6 +93,7 @@ export function WorkbenchPage() {
   const queryClient = useQueryClient();
 
   const symbol = (routeSymbol ?? 'AAPL').toUpperCase();
+  const indexMode = isIndexSymbol(symbol);
   const timeframe = useWorkbenchStore((s) => s.timeframe);
   const setTimeframe = useWorkbenchStore((s) => s.setTimeframe);
   const setSymbol = useWorkbenchStore((s) => s.setSymbol);
@@ -74,8 +101,9 @@ export function WorkbenchPage() {
   const selectEvent = useWorkbenchStore((s) => s.selectEvent);
   const rightPanel = useWorkbenchStore((s) => s.rightPanel);
   const setRightPanel = useWorkbenchStore((s) => s.setRightPanel);
-  const tradeSide = useWorkbenchStore((s) => s.tradeSide);
   const openTrade = useWorkbenchStore((s) => s.openTrade);
+  const quickOrderOpen = useWorkbenchStore((s) => s.quickOrderOpen);
+  const setQuickOrderOpen = useWorkbenchStore((s) => s.setQuickOrderOpen);
   const recentSymbols = useWorkbenchStore((s) => s.recentSymbols);
   const setPortfolio = useAccountStore((s) => s.setPortfolio);
   const getPosition = useAccountStore((s) => s.getPosition);
@@ -85,10 +113,18 @@ export function WorkbenchPage() {
   const [mobilePanel, setMobilePanel] = useState<'news' | 'trade' | null>(null);
   const [hoveredBarTime, setHoveredBarTime] = useState<number | null>(null);
   const [hoveredNews, setHoveredNews] = useState<NewsItem[]>([]);
+  const [detailEventId, setDetailEventId] = useState<string | null>(null);
   const [chartVisibleRange, setChartVisibleRange] = useState<LogicalRange | null>(null);
+  const [chartCrosshairTime, setChartCrosshairTime] = useState<number | null>(null);
   const [enabledMain, setEnabledMain] = useState<MainIndicatorId[]>(loadMainIndicators);
   const [enabledSub, setEnabledSub] = useState<SubIndicatorId[]>(loadSubIndicators);
-  const { layout, nudge, nudgeMany, reset, resetAll } = useWorkbenchLayout();
+  const [maPeriods, setMaPeriods] = useState<number[]>(loadMaPeriods);
+  const { layout, nudge, reset, resetAll } = useWorkbenchLayout();
+
+  const handleMaPeriodsChange = useCallback((periods: number[]) => {
+    setMaPeriods(periods);
+    saveMaPeriods(periods);
+  }, []);
 
   const requestIndicatorHeightDelta = useCallback(
     (delta: number) => {
@@ -122,20 +158,29 @@ export function WorkbenchPage() {
     setHoveredBarTime(null);
     setHoveredNews([]);
     setChartVisibleRange(null);
+    setChartCrosshairTime(null);
     selectEvent(null);
+    setDetailEventId(null);
   }, [symbol, timeframe, selectEvent]);
 
   const { data: quoteData, isLoading: quoteLoading, isError: quoteError } = useQuery({
     queryKey: ['quote', symbol],
-    queryFn: () => fetchQuote(symbol),
-    refetchInterval: 15_000,
+    queryFn: ({ signal }) => fetchQuote(symbol, signal),
+    refetchInterval: 30_000,
   });
 
   const { data: barsData, isLoading: barsLoading } = useQuery({
     queryKey: ['bars', symbol, timeframe],
-    queryFn: () => fetchBars(symbol, timeframe, { limit: 300 }),
-    refetchInterval: 60_000,
-    placeholderData: keepPreviousData,
+    queryFn: ({ signal }) => fetchBars(symbol, timeframe, { limit: 300, signal }),
+    refetchInterval: barsRefreshInterval(timeframe),
+    // Keep prior bars only when switching timeframe on the same symbol.
+    // Crossing symbols with keepPreviousData leaves the old Y-scale (e.g. $700)
+    // and the next $100 stock can render off-screen.
+    placeholderData: (previousData, previousQuery) => {
+      const prevSymbol = previousQuery?.queryKey?.[1];
+      if (prevSymbol === symbol) return previousData;
+      return undefined;
+    },
   });
 
   // Fire the news request in parallel with bars (don't wait for the chart to load).
@@ -149,9 +194,10 @@ export function WorkbenchPage() {
     isError: newsError,
   } = useQuery({
     queryKey: ['events', symbol, timeframe, newsWindow.start, newsWindow.limit],
-    queryFn: () => fetchEvents(symbol, timeframe, { start: newsWindow.start, limit: newsWindow.limit }),
-    refetchInterval: 120_000,
+    queryFn: ({ signal }) => fetchEvents(symbol, timeframe, { start: newsWindow.start, limit: newsWindow.limit, signal }),
+    refetchInterval: 60_000,
     staleTime: 60_000,
+    enabled: !indexMode,
     // Do NOT keepPreviousData across symbols — a failed/empty prior fetch would
     // blank the news panel and make it look like the DB cache never existed.
     retry: 2,
@@ -174,13 +220,21 @@ export function WorkbenchPage() {
   const { data: portfolio } = useQuery({
     queryKey: ['portfolio'],
     queryFn: fetchPortfolio,
-    refetchInterval: 30_000,
+    refetchInterval: 60_000,
   });
 
   const { data: orders } = useQuery({
     queryKey: ['orders'],
     queryFn: fetchOrders,
-    refetchInterval: 30_000,
+    refetchInterval: bottomTab === 'orders' ? 45_000 : false,
+    enabled: bottomTab === 'orders' || bottomTab === 'trades',
+  });
+
+  const { data: trades } = useQuery({
+    queryKey: ['trades'],
+    queryFn: fetchTrades,
+    refetchInterval: bottomTab === 'trades' ? 45_000 : false,
+    enabled: bottomTab === 'trades' || bottomTab === 'orders',
   });
 
   useEffect(() => {
@@ -188,10 +242,22 @@ export function WorkbenchPage() {
   }, [portfolio, setPortfolio]);
 
   const watchSymbols = watchlist?.items ?? [];
-  const socketSymbols = useMemo(
-    () => [...new Set([symbol, ...watchSymbols, ...recentSymbols])],
-    [symbol, watchSymbols, recentSymbols],
-  );
+  const socketSymbols = useMemo(() => {
+    // Cap subscriptions — each quote used to re-render the whole workbench.
+    const all = [...new Set([symbol, ...watchSymbols, ...recentSymbols])];
+    return all.slice(0, 12);
+  }, [symbol, watchSymbols, recentSymbols]);
+
+  const handleVisibleRangeChange = useCallback((range: LogicalRange | null) => {
+    setChartVisibleRange((prev) => {
+      if (prev?.from === range?.from && prev?.to === range?.to) return prev;
+      return range;
+    });
+  }, []);
+
+  const handleCrosshairTimeChange = useCallback((time: number | null) => {
+    setChartCrosshairTime((prev) => (prev === time ? prev : time));
+  }, []);
   const { quotes } = useMarketSocket(socketSymbols);
 
   const livePrice = quotes[symbol]?.price ?? quoteData?.quote.price ?? 0;
@@ -200,10 +266,17 @@ export function WorkbenchPage() {
 
   const handleBarHover = useCallback(
     (payload: BarHoverPayload) => {
-      setHoveredBarTime(payload.barTime);
-      setHoveredNews(payload.items);
-      setBottomTab('news');
-      setRightPanel('news');
+      // Avoid forcing the News tab / full-page churn on every crosshair move.
+      setHoveredBarTime((prev) => (prev === payload.barTime ? prev : payload.barTime));
+      setHoveredNews((prev) => {
+        if (
+          prev.length === payload.items.length &&
+          prev.every((item, i) => item.id === payload.items[i]?.id)
+        ) {
+          return prev;
+        }
+        return payload.items;
+      });
       if (payload.items.length === 0) {
         selectEvent(null);
         return;
@@ -213,14 +286,14 @@ export function WorkbenchPage() {
         selectEvent(payload.items[0]!.id);
       }
     },
-    [selectEvent, setRightPanel, selectedEventId],
+    [selectEvent, selectedEventId],
   );
 
   const handleSelectNews = useCallback(
     (id: string) => {
       selectEvent(id);
+      setDetailEventId(id);
       setRightPanel('news');
-      setMobilePanel('news');
     },
     [selectEvent, setRightPanel],
   );
@@ -237,6 +310,19 @@ export function WorkbenchPage() {
     }
     return null;
   }, [hoveredBarTime, hoveredNews, selectedEventId, eventsData]);
+
+  const selectedReaction = useMemo(
+    () =>
+      selectedEvent
+        ? computeEventReactionLocal(
+            selectedEvent.id,
+            symbol,
+            selectedEvent.publishedAt,
+            barsData?.bars ?? EMPTY_BARS,
+          )
+        : null,
+    [selectedEvent, symbol, barsData?.bars],
+  );
 
   // While a bar is hovered/pinned the list must show exactly that bar's news, even
   // when it is empty — otherwise the list silently falls back to the newest window
@@ -263,19 +349,22 @@ export function WorkbenchPage() {
     (sym: string) => {
       const s = sym.toUpperCase();
       if (s === symbol) return;
-      const win = newsWindowForTimeframe(timeframe);
       queryClient.prefetchQuery({
         queryKey: ['bars', s, timeframe],
-        queryFn: () => fetchBars(s, timeframe, { limit: 300 }),
-        staleTime: 60_000,
-      });
-      queryClient.prefetchQuery({
-        queryKey: ['events', s, timeframe, win.start, win.limit],
-        queryFn: () => fetchEvents(s, timeframe, { start: win.start, limit: win.limit }),
+        queryFn: ({ signal }) => fetchBars(s, timeframe, { limit: 300, signal }),
         staleTime: 60_000,
       });
     },
     [symbol, timeframe, queryClient],
+  );
+
+  const switchSymbol = useCallback(
+    (nextSymbol: string) => {
+      const next = nextSymbol.toUpperCase();
+      setSymbol(next);
+      navigate(`/workbench/${next}`);
+    },
+    [navigate, setSymbol],
   );
 
   const isWatchlisted = watchSymbols.includes(symbol);
@@ -295,35 +384,109 @@ export function WorkbenchPage() {
     setMobilePanel(null);
   };
 
-  const symbolOrders = (orders?.items ?? []).filter((o) => o.symbol === symbol);
-  const filledTrades = symbolOrders.filter((o) => o.status === 'filled');
+  const allOrders = orders?.items ?? [];
+  const allTrades = trades?.items ?? [];
+  const allPositions = portfolio?.positions ?? [];
   const quote = quoteData?.quote;
 
+  const pageScrollRef = useRef<HTMLDivElement>(null);
+  const leftAsideRef = useRef<HTMLElement>(null);
+  const rightAsideRef = useRef<HTMLElement>(null);
+
+  // Wheel on left/right: drive the page first; once the page can't move further
+  // in that direction, scroll the sidebar under the cursor instead.
+  useEffect(() => {
+    const EPS = 1;
+    const overflowMode = new WeakMap<HTMLElement, boolean>();
+
+    const canScrollY = (el: HTMLElement, deltaY: number): boolean => {
+      if (el.scrollHeight <= el.clientHeight + EPS) return false;
+      if (deltaY > 0) return el.scrollTop + el.clientHeight < el.scrollHeight - EPS;
+      if (deltaY < 0) return el.scrollTop > EPS;
+      return false;
+    };
+
+    const findSidebarScrollables = (root: HTMLElement, from: EventTarget | null): HTMLElement[] => {
+      const found: HTMLElement[] = [];
+      let node: HTMLElement | null =
+        from instanceof HTMLElement ? from : root;
+      while (node && root.contains(node)) {
+        let allowsOverflow = overflowMode.get(node);
+        if (allowsOverflow == null) {
+          const { overflowY } = getComputedStyle(node);
+          allowsOverflow = overflowY === 'auto' || overflowY === 'scroll' || overflowY === 'overlay';
+          overflowMode.set(node, allowsOverflow);
+        }
+        if (
+          allowsOverflow &&
+          node.scrollHeight > node.clientHeight + EPS
+        ) {
+          found.push(node);
+        }
+        if (node === root) break;
+        node = node.parentElement;
+      }
+      return found;
+    };
+
+    const onSidebarWheel = (e: WheelEvent) => {
+      const page = pageScrollRef.current;
+      const aside = e.currentTarget as HTMLElement;
+      if (!page) return;
+
+      const deltaY = e.deltaY;
+      if (deltaY === 0) return;
+
+      // Page (center column) still has room → scroll the whole workbench.
+      if (canScrollY(page, deltaY)) {
+        e.preventDefault();
+        page.scrollTop += deltaY;
+        return;
+      }
+
+      // Page is at top/bottom → scroll the sidebar under the mouse.
+      const target = findSidebarScrollables(aside, e.target).find((el) => canScrollY(el, deltaY));
+      if (target) {
+        e.preventDefault();
+        target.scrollTop += deltaY;
+      }
+    };
+
+    const left = leftAsideRef.current;
+    const right = rightAsideRef.current;
+    left?.addEventListener('wheel', onSidebarWheel, { passive: false });
+    right?.addEventListener('wheel', onSidebarWheel, { passive: false });
+    return () => {
+      left?.removeEventListener('wheel', onSidebarWheel);
+      right?.removeEventListener('wheel', onSidebarWheel);
+    };
+  }, []);
+
   return (
-    <div className="flex h-[calc(100vh-3rem)] flex-col bg-surface">
-      <div className="shrink-0 border-b border-border px-3 py-2 md:px-4">
+    <div className="flex h-[calc(100vh-3.25rem)] flex-col bg-surface">
+      <div className="shrink-0 border-b border-border/80 bg-surface-raised/30 px-3 py-2.5 md:px-4">
         <div className="flex items-center gap-2 md:gap-3">
           <Link to="/" className="btn-ghost p-1.5" title="返回市场首页">
             <ArrowLeft className="h-4 w-4" />
           </Link>
           <div className="min-w-0 flex-1">
-            <div className="flex flex-wrap items-baseline gap-x-2 gap-y-0.5">
-              <h1 className="text-lg font-semibold md:text-xl">{symbol}</h1>
+            <div className="flex flex-wrap items-baseline gap-x-2.5 gap-y-0.5">
+              <h1 className="text-xl font-semibold tracking-tight md:text-2xl">{symbol}</h1>
               {quoteLoading ? (
                 <span className="text-sm text-muted">加载报价…</span>
               ) : quoteError ? (
                 <span className="text-sm text-down">报价加载失败</span>
               ) : (
                 <>
-                  <PriceFlash value={livePrice} className="text-lg font-semibold tabular md:text-xl" />
-                  <span className={`text-sm tabular ${changeColorClass(changePct)}`}>
+                  <PriceFlash value={livePrice} className="text-xl font-semibold tabular md:text-2xl" />
+                  <span className={`text-base tabular ${changeColorClass(changePct)}`}>
                     {formatPercent(changePct)}
                   </span>
                 </>
               )}
             </div>
             {quote && (
-              <div className="mt-1 flex flex-wrap gap-x-3 gap-y-0.5 text-[11px] text-muted tabular">
+              <div className="mt-1 flex flex-wrap gap-x-3.5 gap-y-0.5 text-xs text-muted tabular md:text-sm">
                 <span>昨收 {quote.previousClose.toFixed(2)}</span>
                 <span className="text-up">高 {quote.dayHigh.toFixed(2)}</span>
                 <span className="text-down">低 {quote.dayLow.toFixed(2)}</span>
@@ -345,7 +508,7 @@ export function WorkbenchPage() {
                 key={tf}
                 type="button"
                 onClick={() => setTimeframe(tf)}
-                className={`rounded px-2 py-1 text-xs font-medium ${
+                className={`rounded-md px-2.5 py-1.5 text-sm font-medium ${
                   timeframe === tf ? 'bg-primary/20 text-primary' : 'text-muted hover:text-gray-200'
                 }`}
               >
@@ -353,18 +516,18 @@ export function WorkbenchPage() {
               </button>
             ))}
           </div>
-          <div className="hidden gap-1 lg:flex">
-            <button type="button" onClick={() => openTrade('buy')} className="btn-buy px-3 py-1.5 text-xs">
+          <div className="hidden gap-1.5 lg:flex">
+            <button type="button" onClick={() => openTrade('buy')} className="btn-buy px-3.5 py-1.5 text-sm">
               Buy
             </button>
-            <button type="button" onClick={() => openTrade('sell')} className="btn-sell px-3 py-1.5 text-xs">
+            <button type="button" onClick={() => openTrade('sell')} className="btn-sell px-3.5 py-1.5 text-sm">
               Sell
             </button>
             <button
               type="button"
               onClick={resetAll}
               title="还原左右栏宽度与中间各区高度"
-              className="btn-ghost px-2 py-1.5 text-[11px] text-muted"
+              className="btn-ghost px-2.5 py-1.5 text-xs text-muted"
             >
               重置布局
             </button>
@@ -372,57 +535,53 @@ export function WorkbenchPage() {
         </div>
       </div>
 
-      <div className="flex min-h-0 flex-1 overflow-hidden">
-        <aside
-          className="hidden shrink-0 flex-col border-r border-border lg:flex"
-          style={{ width: layout.leftWidth }}
-        >
-          <div className="border-b border-border p-2">
-            <SearchBox onSelect={(s) => navigate(`/workbench/${s}`)} placeholder="Symbol…" />
-          </div>
-          <WatchlistSection
-            symbols={watchSymbols}
-            current={symbol}
-            onSelect={(s) => navigate(`/workbench/${s}`)}
-            onPrefetch={prefetchSymbol}
-          />
-          {recentSymbols.length > 0 && (
-            <RecentsSection
-              symbols={recentSymbols}
+      <IndexStrip current={symbol} onSelect={switchSymbol} />
+
+      {/* Single page scroller: center content can grow tall; sidebars stay sticky. */}
+      <div ref={pageScrollRef} className="min-h-0 flex-1 overflow-y-auto overscroll-y-contain">
+        <div className="flex min-h-full items-start">
+          <aside
+            ref={leftAsideRef}
+            className="sticky top-0 hidden min-h-0 shrink-0 flex-col overflow-hidden border-r border-border bg-surface lg:flex"
+            style={{
+              width: layout.leftWidth,
+              height: 'calc(100vh - 7.5rem)',
+            }}
+          >
+            <StockScreener
               current={symbol}
-              onSelect={(s) => navigate(`/workbench/${s}`)}
+              watchSymbols={watchSymbols}
+              onSelect={switchSymbol}
               onPrefetch={prefetchSymbol}
             />
-          )}
-        </aside>
+          </aside>
 
-        <div className="hidden h-full shrink-0 self-stretch lg:flex">
-          <ResizeHandle
-            axis="x"
-            title="拖拽调整左侧栏宽度 · 双击还原"
-            onDrag={(d) => nudge('leftWidth', d)}
-            onReset={() => reset('leftWidth')}
-          />
-        </div>
-
-        <div className="flex min-w-0 flex-1 flex-col overflow-hidden">
-          <div className="flex gap-1 overflow-x-auto border-b border-border px-2 py-1 md:hidden">
-            {TIMEFRAMES.map((tf) => (
-              <button
-                key={tf}
-                type="button"
-                onClick={() => setTimeframe(tf)}
-                className={`shrink-0 rounded px-2 py-1 text-xs ${
-                  timeframe === tf ? 'bg-primary/20 text-primary' : 'text-muted'
-                }`}
-              >
-                {tf}
-              </button>
-            ))}
+          <div className="sticky top-0 hidden h-[calc(100vh-7.5rem)] shrink-0 self-start lg:flex">
+            <ResizeHandle
+              axis="x"
+              title="拖拽调整左侧栏宽度 · 双击还原"
+              onDrag={(d) => nudge('leftWidth', d)}
+              onReset={() => reset('leftWidth')}
+            />
           </div>
 
-          <div className="flex min-h-0 flex-1 overflow-hidden">
-            <div className="flex min-h-0 min-w-0 flex-1 flex-col overflow-y-auto p-2 md:p-3">
+          <div className="flex min-w-0 flex-1 flex-col">
+            <div className="flex gap-1 overflow-x-auto border-b border-border px-2 py-1 md:hidden">
+              {TIMEFRAMES.map((tf) => (
+                <button
+                  key={tf}
+                  type="button"
+                  onClick={() => setTimeframe(tf)}
+                  className={`shrink-0 rounded px-2 py-1 text-xs ${
+                    timeframe === tf ? 'bg-primary/20 text-primary' : 'text-muted'
+                  }`}
+                >
+                  {tf}
+                </button>
+              ))}
+            </div>
+
+            <div className="flex flex-col p-2 md:p-3">
               {barsLoading && (
                 <div className="shrink-0 pb-1 text-xs text-muted">
                   正在加载 {symbol} · {timeframe} K线…
@@ -432,19 +591,23 @@ export function WorkbenchPage() {
               <div className="shrink-0 overflow-hidden" style={{ height: layout.chartHeight }}>
                 <ErrorBoundary>
                   <ChartPanel
-                    bars={barsData?.bars ?? []}
-                    newsItems={eventsData?.items ?? []}
+                    bars={barsData?.bars ?? EMPTY_BARS}
+                    newsItems={indexMode ? EMPTY_NEWS : (eventsData?.items ?? EMPTY_NEWS)}
                     timeframe={timeframe}
                     selectedEventId={selectedEventId}
                     position={position}
                     height={Math.max(160, layout.chartHeight - 36)}
                     onBarHover={handleBarHover}
-                    onVisibleRangeChange={setChartVisibleRange}
+                    onVisibleRangeChange={handleVisibleRangeChange}
+                    onCrosshairTimeChange={handleCrosshairTimeChange}
                     enabledMain={enabledMain}
-                    newsLoading={newsFetching}
+                    maPeriods={maPeriods}
+                    newsLoading={!indexMode && newsFetching}
                     newsCached={eventsData?.cached}
                     newsSource={eventsData?.source}
-                    newsError={newsError}
+                    newsError={!indexMode && newsError}
+                    showNewsAnchors={indexMode ? false : undefined}
+                    allowNewsAnchorsToggle={!indexMode}
                   />
                 </ErrorBoundary>
               </div>
@@ -462,10 +625,13 @@ export function WorkbenchPage() {
               >
                 <ErrorBoundary>
                   <IndicatorPane
-                    bars={barsData?.bars ?? []}
+                    bars={barsData?.bars ?? EMPTY_BARS}
                     visibleRange={chartVisibleRange}
+                    crosshairTime={chartCrosshairTime}
                     enabledMain={enabledMain}
                     enabledSub={enabledSub}
+                    maPeriods={maPeriods}
+                    onMaPeriodsChange={handleMaPeriodsChange}
                     onToggleMain={toggleMainIndicator}
                     onToggleSub={toggleSubIndicator}
                     height={layout.indicatorHeight}
@@ -477,33 +643,30 @@ export function WorkbenchPage() {
               <div className="hidden lg:block">
                 <ResizeHandle
                   axis="y"
-                  title="拖拽调整 指标区 ↔ News 高度 · 双击还原"
-                  onDrag={(d) => nudgeMany({ indicatorHeight: d, bottomHeight: -d })}
-                  onReset={() => {
-                    reset('indicatorHeight');
-                    reset('bottomHeight');
-                  }}
+                  title="拖拽调整指标区高度 · 双击还原（超出视口可向下滚动查看 News）"
+                  onDrag={(d) => nudge('indicatorHeight', d)}
+                  onReset={() => reset('indicatorHeight')}
                 />
               </div>
 
               <div
-                className="flex shrink-0 flex-col overflow-hidden rounded-lg border border-border bg-surface-card"
-                style={{ height: layout.bottomHeight }}
+                className="flex min-h-[220px] shrink-0 flex-col overflow-hidden rounded-lg border border-border bg-surface-card"
+                style={{ height: Math.max(220, layout.bottomHeight) }}
               >
                 <div className="flex shrink-0 border-b border-border">
                   {(
                     [
                       { id: 'news', label: 'News' },
-                      { id: 'positions', label: 'Positions' },
-                      { id: 'orders', label: 'Orders' },
-                      { id: 'trades', label: 'Trades' },
+                      { id: 'positions', label: '持仓' },
+                      { id: 'orders', label: '委托' },
+                      { id: 'trades', label: '成交' },
                     ] as const
                   ).map((tab) => (
                     <button
                       key={tab.id}
                       type="button"
                       onClick={() => setBottomTab(tab.id)}
-                      className={`flex-1 px-2 py-1.5 text-xs font-medium ${
+                      className={`flex-1 px-2 py-2 text-sm font-medium ${
                         bottomTab === tab.id
                           ? 'border-b-2 border-primary text-primary'
                           : 'text-muted hover:text-gray-200'
@@ -513,24 +676,31 @@ export function WorkbenchPage() {
                     </button>
                   ))}
                 </div>
-                <div className="min-h-0 flex-1 overflow-y-auto p-2">
+                <div className="min-h-0 flex-1 overflow-auto p-1.5">
                   {bottomTab === 'news' && (
                     <NewsTab
                       symbol={symbol}
-                      items={newsTabItems}
+                      items={indexMode ? EMPTY_NEWS : newsTabItems}
+                      bars={barsData?.bars ?? EMPTY_BARS}
                       barTime={hoveredBarTime}
                       timeframe={timeframe}
                       selectedId={selectedEventId}
                       onSelect={handleSelectNews}
                       cached={eventsData?.cached}
-                      newsError={newsError}
+                      loading={!indexMode && newsFetching}
+                      newsError={!indexMode && newsError}
                       barTimeById={newsBarTimeById}
+                      indexMode={indexMode}
                     />
                   )}
-                  {bottomTab === 'positions' && <PositionsTab positions={portfolio?.positions ?? []} />}
-                  {bottomTab === 'orders' && <OrdersTab orders={symbolOrders} />}
+                  {bottomTab === 'positions' && (
+                    <PositionsTable positions={allPositions} activeSymbol={symbol} />
+                  )}
+                  {bottomTab === 'orders' && (
+                    <OrdersTable orders={allOrders} activeSymbol={symbol} />
+                  )}
                   {bottomTab === 'trades' && (
-                    <OrdersTab orders={filledTrades} emptyLabel="No filled trades" />
+                    <TradesTable trades={allTrades} activeSymbol={symbol} />
                   )}
                 </div>
               </div>
@@ -542,51 +712,69 @@ export function WorkbenchPage() {
                 onReset={() => reset('bottomHeight')}
               />
             </div>
-
-            <div className="hidden h-full shrink-0 self-stretch lg:flex">
-              <ResizeHandle
-                axis="x"
-                title="拖拽调整右侧栏宽度 · 双击还原"
-                onDrag={(d) => nudge('rightWidth', -d)}
-                onReset={() => reset('rightWidth')}
-              />
-            </div>
-
-            <aside
-              className="hidden shrink-0 flex-col border-l border-border lg:flex"
-              style={{ width: layout.rightWidth }}
-            >
-              <div className="flex border-b border-border">
-                <button
-                  type="button"
-                  onClick={() => setRightPanel('news')}
-                  className={`flex flex-1 items-center justify-center gap-1 py-2 text-xs font-medium ${
-                    rightPanel === 'news' ? 'border-b-2 border-news text-news' : 'text-muted'
-                  }`}
-                >
-                  <Newspaper className="h-3.5 w-3.5" /> News
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setRightPanel('trade')}
-                  className={`flex flex-1 items-center justify-center gap-1 py-2 text-xs font-medium ${
-                    rightPanel === 'trade' ? 'border-b-2 border-primary text-primary' : 'text-muted'
-                  }`}
-                >
-                  <ShoppingCart className="h-3.5 w-3.5" /> Trade
-                </button>
-              </div>
-              <div className="min-h-0 flex-1 overflow-hidden">
-                {rightPanel === 'news' ? (
-                  <NewsPanel symbol={symbol} event={selectedEvent} timeframe={timeframe} />
-                ) : (
-                  <TradePanel symbol={symbol} side={tradeSide} newsId={selectedEventId} />
-                )}
-              </div>
-            </aside>
           </div>
+
+          <div className="sticky top-0 hidden h-[calc(100vh-7.5rem)] shrink-0 self-start lg:flex">
+            <ResizeHandle
+              axis="x"
+              title="拖拽调整右侧栏宽度 · 双击还原"
+              onDrag={(d) => nudge('rightWidth', -d)}
+              onReset={() => reset('rightWidth')}
+            />
+          </div>
+
+          <aside
+            ref={rightAsideRef}
+            className="sticky top-0 hidden min-h-0 shrink-0 flex-col overflow-hidden border-l border-border bg-surface lg:flex"
+            style={{
+              width: layout.rightWidth,
+              height: 'calc(100vh - 7.5rem)',
+            }}
+          >
+            <div className="flex shrink-0 border-b border-border">
+              <button
+                type="button"
+                onClick={() => setRightPanel('news')}
+                className={`flex flex-1 items-center justify-center gap-1.5 py-2.5 text-sm font-medium transition-colors ${
+                  rightPanel === 'news' ? 'border-b-2 border-news text-news' : 'text-muted hover:text-gray-200'
+                }`}
+              >
+                <Newspaper className="h-4 w-4" /> News
+              </button>
+              <button
+                type="button"
+                onClick={() => openTrade()}
+                className={`flex flex-1 items-center justify-center gap-1.5 py-2.5 text-sm font-medium transition-colors ${
+                  rightPanel === 'trade' ? 'border-b-2 border-primary text-primary' : 'text-muted hover:text-gray-200'
+                }`}
+              >
+                <ShoppingCart className="h-4 w-4" /> Trade
+              </button>
+            </div>
+            <div className="min-h-0 flex-1 overflow-hidden">
+              {rightPanel === 'news' ? (
+                <NewsPanel
+                  symbol={symbol}
+                  event={selectedEvent}
+                  timeframe={timeframe}
+                  localReaction={selectedReaction}
+                  autoLoadDetails={detailEventId === selectedEvent?.id}
+                />
+              ) : (
+                <OrderBook symbol={symbol} />
+              )}
+            </div>
+          </aside>
         </div>
       </div>
+
+      {quickOrderOpen && !indexMode && (
+        <QuickOrderBox
+          symbol={symbol}
+          newsId={selectedEventId}
+          onClose={() => setQuickOrderOpen(false)}
+        />
+      )}
 
       <div className="flex gap-2 border-t border-border p-2 lg:hidden">
         <button
@@ -613,7 +801,13 @@ export function WorkbenchPage() {
             </button>
           </div>
           <div className="min-h-0 flex-1 overflow-hidden">
-            <NewsPanel symbol={symbol} event={selectedEvent} timeframe={timeframe} />
+            <NewsPanel
+              symbol={symbol}
+              event={selectedEvent}
+              timeframe={timeframe}
+              localReaction={selectedReaction}
+              autoLoadDetails={detailEventId === selectedEvent?.id}
+            />
           </div>
         </div>
       )}
@@ -621,7 +815,6 @@ export function WorkbenchPage() {
       <TradeSheet
         open={tradeSheetOpen}
         symbol={symbol}
-        side={tradeSide}
         newsId={selectedEventId}
         onClose={() => setTradeSheetOpen(false)}
       />
@@ -629,95 +822,41 @@ export function WorkbenchPage() {
   );
 }
 
-function WatchlistSection({
-  symbols,
-  current,
-  onSelect,
-  onPrefetch,
-}: {
-  symbols: string[];
-  current: string;
-  onSelect: (s: string) => void;
-  onPrefetch?: (s: string) => void;
-}) {
-  return (
-    <div className="flex-1 overflow-y-auto">
-      <div className="px-3 py-2 text-[10px] font-medium uppercase tracking-wide text-muted">Watchlist</div>
-      {symbols.length === 0 ? (
-        <p className="px-3 text-xs text-muted">Empty</p>
-      ) : (
-        symbols.map((s) => (
-          <button
-            key={s}
-            type="button"
-            onClick={() => onSelect(s)}
-            onMouseEnter={() => onPrefetch?.(s)}
-            onFocus={() => onPrefetch?.(s)}
-            className={`block w-full px-3 py-1.5 text-left text-sm hover:bg-surface-hover ${
-              s === current ? 'bg-surface-hover text-primary' : ''
-            }`}
-          >
-            {s}
-          </button>
-        ))
-      )}
-    </div>
-  );
-}
-
-function RecentsSection({
-  symbols,
-  current,
-  onSelect,
-  onPrefetch,
-}: {
-  symbols: string[];
-  current: string;
-  onSelect: (s: string) => void;
-  onPrefetch?: (s: string) => void;
-}) {
-  return (
-    <div className="border-t border-border">
-      <div className="px-3 py-2 text-[10px] font-medium uppercase tracking-wide text-muted">Recent</div>
-      {symbols.map((s) => (
-        <button
-          key={s}
-          type="button"
-          onClick={() => onSelect(s)}
-          onMouseEnter={() => onPrefetch?.(s)}
-          onFocus={() => onPrefetch?.(s)}
-          className={`block w-full px-3 py-1.5 text-left text-sm hover:bg-surface-hover ${
-            s === current ? 'bg-surface-hover text-primary' : 'text-muted'
-          }`}
-        >
-          {s}
-        </button>
-      ))}
-    </div>
-  );
-}
-
 function NewsTab({
   symbol,
   items,
+  bars,
   barTime,
   timeframe,
   selectedId,
   onSelect,
-  cached,
+  cached: _cached,
+  loading,
   newsError,
   barTimeById,
+  indexMode,
 }: {
   symbol: string;
   items: NewsItem[];
+  bars: Bar[];
   barTime: number | null;
   timeframe: Timeframe;
   selectedId: string | null;
   onSelect: (id: string) => void;
   cached?: boolean;
+  loading?: boolean;
   newsError?: boolean;
   barTimeById?: Map<string, number>;
+  indexMode?: boolean;
 }) {
+  const [visibleCount, setVisibleCount] = useState(24);
+
+  useEffect(() => {
+    setVisibleCount(barTime != null ? 60 : 24);
+  }, [symbol, timeframe, barTime]);
+
+  const visibleItems = useMemo(() => items.slice(0, visibleCount), [items, visibleCount]);
+
   const bucketLabel = (bt: number): string => {
     if (timeframe === '1Day') return `${formatMarketTime(bt, 'MMM d', false)} 日K`;
     return `${formatMarketTime(bt, 'MMM d, HH:mm', false)}–${formatMarketTime(
@@ -725,114 +864,230 @@ function NewsTab({
       'HH:mm',
     )}`;
   };
-  // Show the time of the candle the news is anchored to (matches the on-chart
-  // bubble), with the raw publish time kept as a secondary hint.
   const alignedLabel = (item: NewsItem): string => {
     const bt = barTimeById?.get(item.id);
     if (bt == null) return formatMarketTime(item.publishedAt, 'MMM d HH:mm');
     return bucketLabel(bt);
   };
-  if (newsError && items.length === 0) {
+
+  if (indexMode) {
     return (
       <EmptyState
-        title={`${symbol} · 新闻加载失败`}
-        description="后端未响应或代理断开。确认 uvicorn 在 :8000 运行后刷新。"
+        title={`${symbol} · 指数模式`}
+        description="道琼斯 / 标普 / 纳斯达克只展示 K 线与指标，不挂载公司新闻锚点。"
         icon={<Newspaper className="h-8 w-8" />}
       />
+    );
+  }
+  if (newsError && items.length === 0) {
+    return (
+      <div className="space-y-3">
+        <RangeAiAnalysis symbol={symbol} defaultTimeframe={timeframe} />
+        <EmptyState
+          title={`${symbol} · 新闻加载失败`}
+          description="后端未响应或代理断开。确认 uvicorn 在 :8000 运行后刷新。"
+          icon={<Newspaper className="h-8 w-8" />}
+        />
+      </div>
+    );
+  }
+  if (items.length === 0 && loading) {
+    return (
+      <div className="space-y-3">
+        <RangeAiAnalysis symbol={symbol} defaultTimeframe={timeframe} />
+        <EmptyState
+          title={`${symbol} · 正在抓取新闻…`}
+          description="该股票首次访问，需要从上游拉取整段窗口（约 10-20 秒），之后会走本地库秒开。"
+          icon={<Newspaper className="h-8 w-8 animate-pulse" />}
+        />
+      </div>
     );
   }
   if (items.length === 0 && barTime != null) {
     return (
-      <EmptyState
-        title={`${symbol} · 该时段无新闻`}
-        description={`${bucketLabel(barTime)} · 移开光标可查看窗口内全部新闻`}
-        icon={<Newspaper className="h-8 w-8" />}
-      />
+      <div className="space-y-3">
+        <RangeAiAnalysis symbol={symbol} defaultTimeframe={timeframe} />
+        <EmptyState
+          title={`${symbol} · 该时段无新闻`}
+          description={`${bucketLabel(barTime)} · 移开光标可查看窗口内全部新闻`}
+          icon={<Newspaper className="h-8 w-8" />}
+        />
+      </div>
     );
   }
   if (items.length === 0) {
     return (
-      <EmptyState
-        title={`${symbol} · 暂无新闻`}
-        description="新闻已落本地库；若仍为空，确认后端在跑，或稍后切换周期重试。"
-        icon={<Newspaper className="h-8 w-8" />}
-      />
+      <div className="space-y-3">
+        <RangeAiAnalysis symbol={symbol} defaultTimeframe={timeframe} />
+        <EmptyState
+          title={`${symbol} · 暂无新闻`}
+          description="新闻已落本地库；若仍为空，确认后端在跑，或稍后切换周期重试。"
+          icon={<Newspaper className="h-8 w-8" />}
+        />
+      </div>
     );
   }
+
+  const dirLabel = (d: string) => {
+    if (d === 'positive') return '利好';
+    if (d === 'negative') return '利空';
+    if (d === 'neutral') return '中性';
+    return '未定';
+  };
+  const impLabel = (i: string) => {
+    if (i === 'high') return '高影响';
+    if (i === 'medium') return '中影响';
+    return '低影响';
+  };
+
+  const imageById = assignRelatedNewsImages(visibleItems, symbol);
+
   return (
-    <div className="space-y-1">
-      <div className="px-1 pb-1 text-[10px] text-muted">
+    <div className="space-y-3">
+      <RangeAiAnalysis symbol={symbol} defaultTimeframe={timeframe} />
+      <div className="px-0.5 text-[11px] text-muted">
         {barTime != null
           ? `${symbol} · ${bucketLabel(barTime)} · ${timeframe} · ${items.length} 条`
-          : `${symbol} · 窗口内新闻 · ${items.length} 条${cached ? ' · 本地库' : ''} · 点击查看详情`}
+          : `${symbol} · ${items.length} 条 · 点击查看详情`}
       </div>
-      {items.map((item) => (
+      <div className="grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-3">
+        {visibleItems.map((item) => {
+          const selected = selectedId === item.id;
+          const session = marketSessionOf(item.publishedAt);
+          const dir = item.direction;
+          const dirClass =
+            dir === 'positive'
+              ? 'border-up/35 bg-up/15 text-up'
+              : dir === 'negative'
+                ? 'border-down/35 bg-down/15 text-down'
+                : 'border-border bg-surface-hover text-muted';
+          const impClass =
+            item.importance === 'high'
+              ? 'border-down/35 bg-down/10 text-down'
+              : item.importance === 'medium'
+                ? 'border-news/35 bg-news/10 text-news'
+                : 'border-border bg-surface-hover text-muted';
+          const reaction = computeEventReactionLocal(item.id, symbol, item.publishedAt, bars);
+          const imageUrl = imageById.get(item.id);
+          return (
+            <button
+              key={item.id}
+              type="button"
+              onClick={() => onSelect(item.id)}
+              className={`flex flex-col overflow-hidden rounded-xl border text-left transition-colors hover:bg-surface-hover ${
+                selected ? 'border-news/55 bg-news/10' : 'border-border/80 bg-surface-card/50'
+              }`}
+            >
+              <div className="relative h-28 w-full shrink-0 bg-surface-hover">
+                {imageUrl ? (
+                  <img
+                    src={imageUrl}
+                    alt=""
+                    loading="lazy"
+                    referrerPolicy="no-referrer"
+                    className="h-full w-full object-cover"
+                    onError={(e) => {
+                      (e.currentTarget as HTMLImageElement).style.display = 'none';
+                    }}
+                  />
+                ) : (
+                  <div className="flex h-full w-full items-center justify-center">
+                    <Newspaper className="h-8 w-8 text-muted/40" />
+                  </div>
+                )}
+              </div>
+
+              <div className="flex min-h-0 flex-1 flex-col gap-2 p-3">
+                <div className="line-clamp-3 text-[14px] font-semibold leading-snug text-gray-100">
+                  {item.headline}
+                </div>
+
+                <div className="flex flex-wrap items-center gap-1.5">
+                  <span
+                    className={`rounded-md border px-2 py-0.5 text-[11px] font-semibold ${dirClass}`}
+                    title="标题与摘要的多信号评分方向"
+                  >
+                    {dirLabel(dir)}
+                  </span>
+                  <span
+                    className={`rounded-md border px-2 py-0.5 text-[11px] font-semibold ${impClass}`}
+                    title="按事件类型、催化强度与内容属性综合评分"
+                  >
+                    {impLabel(item.importance)}
+                  </span>
+                  <span className="rounded-md border border-border/80 bg-surface px-2 py-0.5 text-[11px] text-muted">
+                    {item.eventType.replace(/_/g, ' ')}
+                  </span>
+                  {session !== 'regular' && (
+                    <span className={`rounded-md border px-2 py-0.5 text-[11px] ${marketSessionClass(session)}`}>
+                      {marketSessionLabel(session)}
+                    </span>
+                  )}
+                </div>
+
+                <div className="grid grid-cols-3 gap-1.5">
+                  <ReactionChip label="Post 5m" value={formatReactionPct(reaction?.post5m)} raw={reaction?.post5m} />
+                  <ReactionChip label="Post 30m" value={formatReactionPct(reaction?.post30m)} raw={reaction?.post30m} />
+                  <ReactionChip label="Post 60m" value={formatReactionPct(reaction?.post60m)} raw={reaction?.post60m} />
+                  <ReactionChip label="Max up" value={formatReactionPct(reaction?.maxUp)} raw={reaction?.maxUp} />
+                  <ReactionChip
+                    label="Max DD"
+                    value={formatReactionPct(reaction?.maxDrawdown)}
+                    raw={reaction?.maxDrawdown}
+                  />
+                  <ReactionChip
+                    label="Vol"
+                    value={formatReactionRatio(reaction?.volumeRatio)}
+                    raw={null}
+                    muted
+                  />
+                </div>
+
+                <div className="mt-auto flex flex-wrap items-center gap-x-1.5 pt-0.5 text-[11px] text-muted">
+                  <span className="text-gray-300">{alignedLabel(item)}</span>
+                  <span>·</span>
+                  <span className="truncate">{item.source}</span>
+                </div>
+              </div>
+            </button>
+          );
+        })}
+      </div>
+      {visibleCount < items.length && (
         <button
-          key={item.id}
           type="button"
-          onClick={() => onSelect(item.id)}
-          className={`w-full rounded px-2 py-1.5 text-left text-xs transition-colors hover:bg-surface-hover ${
-            selectedId === item.id ? 'border border-news/40 bg-news/5' : 'border border-transparent'
-          }`}
+          onClick={() => setVisibleCount((count) => Math.min(count + 24, items.length))}
+          className="btn-ghost w-full border border-border py-2.5 text-sm"
         >
-          <div className="truncate font-medium text-gray-200">{item.headline}</div>
-          <div className="flex flex-wrap items-center gap-x-1.5 text-[10px] text-muted">
-            <span className="text-gray-300">{alignedLabel(item)}</span>
-            {(() => {
-              const session = marketSessionOf(item.publishedAt);
-              if (session === 'regular') return null;
-              return (
-                <span
-                  className={`rounded border px-1 leading-4 ${marketSessionClass(session)}`}
-                  title="该新闻发布于非交易时段，已就近挂到相邻的真实 K 线"
-                >
-                  {marketSessionLabel(session)}
-                </span>
-              );
-            })()}
-            <span>发布 {formatMarketTime(item.publishedAt, 'MMM d HH:mm')}</span>
-            <span>· {item.source}</span>
-          </div>
+          加载更多新闻（已显示 {visibleItems.length} / {items.length}）
         </button>
-      ))}
+      )}
     </div>
   );
 }
 
-function PositionsTab({ positions }: { positions: Position[] }) {
-  if (positions.length === 0) {
-    return <EmptyState title="No positions" />;
-  }
+function ReactionChip({
+  label,
+  value,
+  raw,
+  muted,
+}: {
+  label: string;
+  value: string;
+  raw: number | null | undefined;
+  muted?: boolean;
+}) {
+  const color = muted
+    ? 'text-gray-200'
+    : raw == null
+      ? 'text-muted'
+      : raw >= 0
+        ? 'text-up'
+        : 'text-down';
   return (
-    <div className="space-y-1">
-      {positions.map((p) => (
-        <div key={p.symbol} className="flex justify-between rounded px-2 py-1 text-xs">
-          <span className="font-medium">{p.symbol}</span>
-          <span className="tabular text-muted">
-            {p.quantity} · {formatCurrency(p.marketValue)}
-          </span>
-        </div>
-      ))}
-    </div>
-  );
-}
-
-function OrdersTab({ orders, emptyLabel = 'No orders' }: { orders: Order[]; emptyLabel?: string }) {
-  if (orders.length === 0) {
-    return <EmptyState title={emptyLabel} />;
-  }
-  return (
-    <div className="space-y-1">
-      {orders.map((o) => (
-        <div key={o.id} className="flex justify-between rounded px-2 py-1 text-xs">
-          <span className={o.side === 'buy' ? 'text-up' : 'text-down'}>
-            {o.side.toUpperCase()} {o.symbol}
-          </span>
-          <span className="tabular text-muted">
-            {o.quantity} · {o.status}
-          </span>
-        </div>
-      ))}
+    <div className="rounded-md border border-border/70 bg-surface/80 px-1.5 py-1">
+      <div className="text-[9px] uppercase tracking-wide text-muted">{label}</div>
+      <div className={`tabular text-[12px] font-semibold leading-tight ${color}`}>{value}</div>
     </div>
   );
 }

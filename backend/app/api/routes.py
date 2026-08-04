@@ -9,6 +9,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query, WebSocket, WebSock
 from sqlalchemy.orm import Session
 
 from app.core.config import get_settings
+from app.core.llm_runtime import effective_llm_config, public_llm_view, save_llm_settings
 from app.database.session import (
     NewsAnalysisRow,
     NewsContentRow,
@@ -19,26 +20,72 @@ from app.database.session import (
     init_db,
 )
 from app.providers.factory import provider_factory
-from app.providers.market.fixture_provider import content_hash, load_universe, universe_profiles
+from app.providers.market.fixture_provider import load_universe, universe_profiles
 from app.schemas.market import (
     BarsResponse,
     NewsResponse,
+    OrderBookResponse,
     OrderPreviewRequest,
     ProviderMeta,
     QuoteResponse,
+    RangeAnalysisRequest,
     SnapshotsResponse,
 )
 from app.services.article import fetch_article_text
 from app.services.events import aggregate_daily_markers, align_event_to_bar, compute_event_reaction
 from app.services.news_store import get_news_window, row_to_item
-from app.services.trading import build_portfolio_state, ensure_portfolio, preview_order, reset_demo, simulate_order
+from app.services.range_analysis import build_news_facts, build_technical_facts, lookback_start
+from app.services.danmaku import list_danmaku, post_danmaku
+from app.services.orderbook import build_order_book
+from app.services.market_hub import get_shared_quote
+from app.services.trading import (
+    build_portfolio_state,
+    closed_position_rankings,
+    ensure_portfolio,
+    list_orders,
+    list_trades,
+    preview_order,
+    reset_demo,
+    simulate_order,
+)
 
 router = APIRouter()
 
 _quote_cache: TTLCache = TTLCache(maxsize=512, ttl=5)
+_orderbook_cache: TTLCache = TTLCache(maxsize=256, ttl=2)
 _snap_cache: TTLCache = TTLCache(maxsize=64, ttl=25)
+_screener_cache: TTLCache = TTLCache(maxsize=4, ttl=120)
 _bars_cache: TTLCache = TTLCache(maxsize=256, ttl=60)
-_news_cache: TTLCache = TTLCache(maxsize=256, ttl=300)
+_request_locks: dict[str, asyncio.Lock] = {}
+_screener_last: dict[str, tuple[list, str]] = {}
+_background_tasks: set[asyncio.Task] = set()
+
+
+def _request_lock(key: str) -> asyncio.Lock:
+    lock = _request_locks.get(key)
+    if lock is None:
+        lock = asyncio.Lock()
+        _request_locks[key] = lock
+    return lock
+
+
+async def _load_screener(cache_key: str, equities_only: bool) -> tuple[list, str]:
+    async with _request_lock(cache_key):
+        if cache_key in _screener_cache:
+            return _screener_cache[cache_key]
+        rows = load_universe()
+        if equities_only:
+            rows = [r for r in rows if (r.get("assetType") or "equity") == "equity"]
+        syms = [r["symbol"].upper() for r in rows]
+        market = provider_factory.create_market_provider()
+        snaps: list = []
+        batch = max(5, min(40, get_settings().yfinance_batch_size))
+        for i in range(0, len(syms), batch):
+            snaps.extend(await market.get_snapshots(syms[i : i + batch]))
+        result = (snaps, market.name)
+        _screener_cache[cache_key] = result
+        _screener_last[cache_key] = result
+        return result
 
 
 def _meta(provider: str, cached: bool = False, stale: bool = False, fixture: bool = False, err: str | None = None) -> ProviderMeta:
@@ -60,30 +107,46 @@ async def health():
 @router.get("/config/public")
 async def public_config():
     s = get_settings()
+    llm = effective_llm_config()
     return {
         "marketDataProvider": s.market_data_provider,
         "newsProvider": s.news_provider,
         "realtimeProvider": s.realtime_provider,
-        "llmProvider": s.llm_provider if not (s.llm_provider == "deepseek" and not s.deepseek_configured) else "rules",
+        "llmProvider": llm["effectiveProvider"],
         "fixtureMode": s.fixture_mode,
         "timezone": s.default_market_timezone,
         "initialCash": s.initial_cash,
         "alpacaConfigured": s.alpaca_configured,
-        "deepseekConfigured": s.deepseek_configured,
+        "deepseekConfigured": llm["deepseekConfigured"],
     }
+
+
+@router.get("/config/llm")
+async def get_llm_config():
+    return public_llm_view()
+
+
+@router.put("/config/llm")
+async def put_llm_config(payload: dict):
+    """Save runtime LLM settings (provider + DeepSeek key/model). Takes effect immediately."""
+    try:
+        return save_llm_settings(payload or {})
+    except Exception as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
 
 
 @router.get("/providers/status")
 async def providers_status():
     s = get_settings()
+    llm = effective_llm_config()
     return {
         "market": s.market_data_provider,
         "news": s.news_provider,
         "realtime": s.realtime_provider,
-        "llm": s.llm_provider,
+        "llm": llm["effectiveProvider"],
         "yfinance": "active" if s.market_data_provider == "yfinance" else "standby",
         "alpacaConfigured": s.alpaca_configured,
-        "deepseekConfigured": s.deepseek_configured,
+        "deepseekConfigured": llm["deepseekConfigured"],
         "fixtureEnabled": s.fixture_mode or s.market_data_provider == "fixture",
     }
 
@@ -112,30 +175,92 @@ async def symbol_profile(symbol: str):
 
 @router.get("/market/snapshots")
 async def market_snapshots(symbols: str = Query(...)):
-    syms = [s.strip().upper() for s in symbols.split(",") if s.strip()]
+    syms = list(dict.fromkeys(s.strip().upper() for s in symbols.split(",") if s.strip()))
     key = ",".join(syms)
     if key in _snap_cache:
         data, provider = _snap_cache[key]
         return SnapshotsResponse(snapshots=data, meta=_meta(provider, cached=True)).model_dump(by_alias=True)
-    market = provider_factory.create_market_provider()
-    snaps = await market.get_snapshots(syms)
-    _snap_cache[key] = (snaps, market.name)
+    async with _request_lock(f"snapshots:{key}"):
+        if key in _snap_cache:
+            data, provider = _snap_cache[key]
+            return SnapshotsResponse(snapshots=data, meta=_meta(provider, cached=True)).model_dump(by_alias=True)
+        market = provider_factory.create_market_provider()
+        snaps = await market.get_snapshots(syms)
+        _snap_cache[key] = (snaps, market.name)
     return SnapshotsResponse(
         snapshots=snaps,
         meta=_meta(market.name, fixture=market.name == "fixture"),
     ).model_dump(by_alias=True)
 
 
+@router.get("/market/screener")
+async def market_screener(equities_only: bool = True):
+    """Full-universe snapshot board for the left-panel screener.
+
+    Sorted / filtered on the client. Cached for 60s so switching sort keys is free.
+    """
+    cache_key = f"screener:{int(equities_only)}"
+    if cache_key in _screener_cache:
+        data, provider = _screener_cache[cache_key]
+        return SnapshotsResponse(snapshots=data, meta=_meta(provider, cached=True)).model_dump(by_alias=True)
+
+    stale = _screener_last.get(cache_key)
+    if stale is not None:
+        lock = _request_lock(cache_key)
+        if not lock.locked():
+            task = asyncio.create_task(_load_screener(cache_key, equities_only))
+            _background_tasks.add(task)
+            task.add_done_callback(_background_tasks.discard)
+        snaps, provider = stale
+        return SnapshotsResponse(
+            snapshots=snaps,
+            meta=_meta(provider, cached=True, stale=True),
+        ).model_dump(by_alias=True)
+
+    snaps, provider = await _load_screener(cache_key, equities_only)
+    return SnapshotsResponse(
+        snapshots=snaps,
+        meta=_meta(provider, fixture=provider == "fixture"),
+    ).model_dump(by_alias=True)
+
+
 @router.get("/market/quote/{symbol}")
 async def market_quote(symbol: str):
     symbol = symbol.upper()
-    if symbol in _quote_cache:
-        q, provider = _quote_cache[symbol]
-        return QuoteResponse(quote=q, meta=_meta(provider, cached=True)).model_dump(by_alias=True)
-    market = provider_factory.create_market_provider()
-    q = await market.get_quote(symbol)
-    _quote_cache[symbol] = (q, market.name)
-    return QuoteResponse(quote=q, meta=_meta(market.name, fixture=market.name == "fixture")).model_dump(by_alias=True)
+    q, provider, cached = await get_shared_quote(symbol, max_age=5.0)
+    return QuoteResponse(
+        quote=q,
+        meta=_meta(provider, cached=cached, fixture=provider == "fixture"),
+    ).model_dump(by_alias=True)
+
+
+@router.get("/market/orderbook/{symbol}")
+async def market_orderbook(symbol: str, levels: int = Query(default=12, ge=5, le=25)):
+    """Synthetic L2 ladder derived from latest quote (demo depth, not venue data)."""
+    symbol = symbol.upper()
+    cache_key = f"{symbol}:{levels}"
+    if cache_key in _orderbook_cache:
+        book = _orderbook_cache[cache_key]
+        return OrderBookResponse(
+            book=book,
+            meta=_meta(book.provider, cached=True, fixture=book.provider == "fixture"),
+        ).model_dump(by_alias=True)
+    async with _request_lock(f"orderbook:{cache_key}"):
+        if cache_key in _orderbook_cache:
+            book = _orderbook_cache[cache_key]
+            return OrderBookResponse(
+                book=book,
+                meta=_meta(book.provider, cached=True, fixture=book.provider == "fixture"),
+            ).model_dump(by_alias=True)
+        try:
+            book = await build_order_book(symbol, levels=levels)
+        except Exception as exc:
+            raise HTTPException(status_code=502, detail=str(exc)) from exc
+        _orderbook_cache[cache_key] = book
+    return OrderBookResponse(
+        book=book,
+        meta=_meta(book.provider, fixture=book.provider == "fixture"),
+    ).model_dump(by_alias=True)
 
 
 @router.get("/market/bars/{symbol}")
@@ -158,13 +283,22 @@ async def market_bars(
             bars=bars,
             meta=_meta(provider, cached=True),
         ).model_dump(by_alias=True)
-    market = provider_factory.create_market_provider()
-    bars = await market.get_bars(symbol, timeframe, start, end, limit)
-    used_start = bars[0].timestamp if bars else start
-    used_end = bars[-1].timestamp if bars else end
-    ttl = {"1Min": 30, "5Min": 60, "15Min": 60, "1Hour": 300, "1Day": 900}.get(timeframe, 60)
-    _bars_cache[cache_key] = (bars, market.name, used_start, used_end)
-    # manually approximate ttl by storing; cachetools uses fixed ttl for cache object — acceptable
+    async with _request_lock(f"bars:{cache_key}"):
+        if cache_key in _bars_cache:
+            bars, provider, used_start, used_end = _bars_cache[cache_key]
+            return BarsResponse(
+                symbol=symbol,
+                timeframe=timeframe,
+                start=used_start,
+                end=used_end,
+                bars=bars,
+                meta=_meta(provider, cached=True),
+            ).model_dump(by_alias=True)
+        market = provider_factory.create_market_provider()
+        bars = await market.get_bars(symbol, timeframe, start, end, limit)
+        used_start = bars[0].timestamp if bars else start
+        used_end = bars[-1].timestamp if bars else end
+        _bars_cache[cache_key] = (bars, market.name, used_start, used_end)
     return BarsResponse(
         symbol=symbol,
         timeframe=timeframe,
@@ -191,47 +325,11 @@ async def get_news(
     db: Session = Depends(get_db),
 ):
     symbol = symbol.upper()
-    cache_key = f"{symbol}:{limit}:{start.isoformat() if start else '-'}:{end.isoformat() if end else '-'}"
-    if cache_key in _news_cache:
-        items, provider = _news_cache[cache_key]
-        return NewsResponse(items=items, meta=_meta(provider, cached=True)).model_dump(by_alias=True)
-
-    news_p = provider_factory.create_news_provider()
-    items = await news_p.get_news(symbol, start, end, limit)
-    # persist lightly
-    now = datetime.now(timezone.utc)
-    for item in items:
-        existing = db.query(NewsEventRow).filter(NewsEventRow.id == item.id).first()
-        if existing:
-            continue
-        h = content_hash(item.headline, item.url, item.published_at.isoformat())
-        db.add(
-            NewsEventRow(
-                id=item.id,
-                external_id=item.id,
-                symbol=symbol,
-                headline=item.headline,
-                publisher=item.source,
-                url=item.url,
-                published_at=item.published_at,
-                summary_original=item.summary_original,
-                summary_ai=item.summary_ai,
-                event_type=item.event_type,
-                importance=item.importance,
-                direction=item.direction,
-                time_horizon=item.time_horizon,
-                provider=item.provider,
-                content_hash=h,
-                created_at=now,
-                updated_at=now,
-            )
-        )
-    try:
-        db.commit()
-    except Exception:
-        db.rollback()
-    _news_cache[cache_key] = (items, news_p.name)
-    return NewsResponse(items=items, meta=_meta(news_p.name, fixture=news_p.name == "fixture")).model_dump(by_alias=True)
+    items, source, cached = await get_news_window(db, symbol, start, end, limit)
+    return NewsResponse(
+        items=items,
+        meta=_meta(source, cached=cached, fixture=source == "fixture"),
+    ).model_dump(by_alias=True)
 
 
 @router.get("/news/{news_id}/content")
@@ -241,29 +339,34 @@ async def news_content(news_id: str, db: Session = Depends(get_db)):
     if cached is not None:
         return {"newsId": news_id, "url": cached.url, "body": cached.body, "cached": True}
 
-    row = db.query(NewsEventRow).filter(NewsEventRow.id == news_id).first()
-    if row is None:
-        raise HTTPException(404, "News not found")
+    async with _request_lock(f"news-content:{news_id}"):
+        cached = db.query(NewsContentRow).filter(NewsContentRow.news_id == news_id).first()
+        if cached is not None:
+            return {"newsId": news_id, "url": cached.url, "body": cached.body, "cached": True}
 
-    body = ""
-    if row.url:
-        body = await asyncio.to_thread(fetch_article_text, row.url)
-    if not body:
-        body = row.summary_original or ""
+        row = db.query(NewsEventRow).filter(NewsEventRow.id == news_id).first()
+        if row is None:
+            raise HTTPException(404, "News not found")
 
-    db.add(
-        NewsContentRow(
-            news_id=news_id,
-            url=row.url,
-            body=body,
-            fetched_at=datetime.now(timezone.utc),
+        body = ""
+        if row.url:
+            body = await asyncio.to_thread(fetch_article_text, row.url)
+        if not body:
+            body = row.summary_original or ""
+
+        db.add(
+            NewsContentRow(
+                news_id=news_id,
+                url=row.url,
+                body=body,
+                fetched_at=datetime.now(timezone.utc),
+            )
         )
-    )
-    try:
-        db.commit()
-    except Exception:
-        db.rollback()
-    return {"newsId": news_id, "url": row.url, "body": body, "cached": False}
+        try:
+            db.commit()
+        except Exception:
+            db.rollback()
+        return {"newsId": news_id, "url": row.url, "body": body, "cached": False}
 
 
 @router.post("/news/{news_id}/analyze")
@@ -297,6 +400,43 @@ async def analyze_news(news_id: str, db: Session = Depends(get_db)):
         )
         db.commit()
     return analysis.model_dump(by_alias=True)
+
+
+@router.post("/ai/range-analysis")
+async def ai_range_analysis(body: RangeAnalysisRequest, db: Session = Depends(get_db)):
+    """Analyze technical bars + news inside a user-selected chart window."""
+    symbol = body.symbol.upper().strip()
+    if not symbol:
+        raise HTTPException(status_code=400, detail="symbol required")
+    start, end = body.start, body.end
+    if start.tzinfo is None:
+        start = start.replace(tzinfo=timezone.utc)
+    if end.tzinfo is None:
+        end = end.replace(tzinfo=timezone.utc)
+    if end <= start:
+        raise HTTPException(status_code=400, detail="end must be after start")
+
+    market = provider_factory.create_market_provider()
+    # Fetch lookback history so RSI/MACD/MA can compute even on short windows.
+    fetch_start = lookback_start(start, body.timeframe)
+    all_bars = await market.get_bars(symbol, body.timeframe, fetch_start, end, 1200)
+    all_bars = [b for b in all_bars if b.timestamp <= end]
+    window_bars = [b for b in all_bars if start <= b.timestamp <= end]
+    items, _source, _cached = await get_news_window(db, symbol, start, end, 80)
+    tech = build_technical_facts(window_bars, body.timeframe, context_bars=all_bars)
+    news = build_news_facts(items, limit=25)
+    llm = provider_factory.create_llm_provider()
+    report = await llm.analyze_range(
+        {
+            "symbol": symbol,
+            "timeframe": body.timeframe,
+            "start": start,
+            "end": end,
+            "technical": tech,
+            "news": news,
+        }
+    )
+    return report.model_dump(by_alias=True)
 
 
 @router.get("/events/{symbol}")
@@ -355,13 +495,13 @@ async def event_reaction(
 
 
 @router.get("/watchlist")
-async def get_watchlist(db: Session = Depends(get_db)):
+def get_watchlist(db: Session = Depends(get_db)):
     rows = db.query(WatchlistRow).order_by(WatchlistRow.created_at.desc()).all()
     return {"items": [r.symbol for r in rows]}
 
 
 @router.post("/watchlist/{symbol}")
-async def add_watchlist(symbol: str, db: Session = Depends(get_db)):
+def add_watchlist(symbol: str, db: Session = Depends(get_db)):
     symbol = symbol.upper()
     if not db.query(WatchlistRow).filter(WatchlistRow.symbol == symbol).first():
         db.add(WatchlistRow(symbol=symbol, created_at=datetime.now(timezone.utc)))
@@ -370,7 +510,7 @@ async def add_watchlist(symbol: str, db: Session = Depends(get_db)):
 
 
 @router.delete("/watchlist/{symbol}")
-async def remove_watchlist(symbol: str, db: Session = Depends(get_db)):
+def remove_watchlist(symbol: str, db: Session = Depends(get_db)):
     row = db.query(WatchlistRow).filter(WatchlistRow.symbol == symbol.upper()).first()
     if row:
         db.delete(row)
@@ -385,6 +525,28 @@ async def portfolio(db: Session = Depends(get_db)):
     return state.model_dump(by_alias=True)
 
 
+@router.get("/portfolio/equity-history")
+async def portfolio_equity_history(
+    range: str = Query("1d", description="1d|1w|1m|6m|1y"),
+    db: Session = Depends(get_db),
+):
+    ensure_portfolio(db)
+    state = await build_portfolio_state(db)
+    from app.services.equity_history import get_equity_history
+
+    return get_equity_history(
+        range,
+        current_equity=state.equity,
+        current_cash=state.cash,
+        current_mv=state.market_value,
+    )
+
+
+@router.get("/portfolio/closed-rankings")
+def portfolio_closed_rankings(limit: int = Query(20, ge=1, le=50), db: Session = Depends(get_db)):
+    return {"items": closed_position_rankings(db, limit=limit)}
+
+
 @router.get("/positions")
 async def positions(db: Session = Depends(get_db)):
     state = await build_portfolio_state(db)
@@ -392,28 +554,13 @@ async def positions(db: Session = Depends(get_db)):
 
 
 @router.get("/orders")
-async def orders(db: Session = Depends(get_db)):
-    rows = db.query(OrderRow).order_by(OrderRow.created_at.desc()).limit(100).all()
-    return {
-        "items": [
-            {
-                "id": r.id,
-                "symbol": r.symbol,
-                "side": r.side,
-                "orderType": r.order_type,
-                "quantity": r.quantity,
-                "limitPrice": r.limit_price,
-                "stopLoss": r.stop_loss,
-                "takeProfit": r.take_profit,
-                "status": r.status,
-                "filledPrice": r.filled_price,
-                "filledAt": r.filled_at,
-                "newsId": r.news_id,
-                "createdAt": r.created_at,
-            }
-            for r in rows
-        ]
-    }
+def orders(db: Session = Depends(get_db)):
+    return {"items": list_orders(db)}
+
+
+@router.get("/trades")
+def trades(db: Session = Depends(get_db)):
+    return {"items": list_trades(db)}
 
 
 @router.post("/orders/preview")
@@ -445,3 +592,21 @@ async def cancel_order(order_id: str, db: Session = Depends(get_db)):
 async def demo_reset(db: Session = Depends(get_db)):
     reset_demo(db)
     return {"ok": True}
+
+
+@router.get("/danmaku/{symbol}")
+def danmaku_list(symbol: str, after: Optional[int] = None):
+    """Lightweight in-memory room for workbench live comments (demo)."""
+    items = list_danmaku(symbol, after=after)
+    return {"symbol": symbol.upper(), "items": items}
+
+
+@router.post("/danmaku/{symbol}")
+def danmaku_post(symbol: str, payload: dict):
+    text = str(payload.get("text") or "")
+    nickname = payload.get("nickname")
+    try:
+        msg = post_danmaku(symbol, text, nickname=str(nickname) if nickname else None)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    return {"item": msg}

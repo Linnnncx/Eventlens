@@ -1,8 +1,9 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { ExternalLink, Sparkles, TrendingDown, TrendingUp, Minus } from 'lucide-react';
-import { analyzeNews, fetchEventReaction, fetchNewsContent } from '../../api/endpoints';
+import { ExternalLink, Settings2, Sparkles, TrendingDown, TrendingUp, Minus } from 'lucide-react';
+import { useEffect, useMemo, useState } from 'react';
+import { analyzeNews, fetchEventReaction, fetchNewsContent, fetchPublicConfig } from '../../api/endpoints';
 import { EmptyState } from '../../components/EmptyState';
-import type { NewsItem, Timeframe } from '../../types/api';
+import type { EventReaction, NewsAnalysis, NewsItem, Timeframe } from '../../types/api';
 import {
   directionColor,
   directionLabel,
@@ -10,27 +11,62 @@ import {
   formatPercent,
   importanceColor,
 } from '../../utils/format';
+import { relatedNewsImageUrl } from '../../utils/relatedNewsImage';
+import { AiSettingsPanel } from './AiSettingsPanel';
+import { AiStatusBadge } from './AiStatusBadge';
 
 interface NewsPanelProps {
   symbol: string;
   event: NewsItem | null;
   timeframe: Timeframe;
+  localReaction?: Partial<EventReaction> | null;
+  autoLoadDetails?: boolean;
 }
 
-export function NewsPanel({ symbol, event, timeframe }: NewsPanelProps) {
+function analysisFromEvent(event: NewsItem): NewsAnalysis | null {
+  if (!event.summaryAi) return null;
+  return {
+    summaryZh: event.summaryAi,
+    eventType: event.eventType,
+    importance: event.importance,
+    direction: event.direction,
+    timeHorizon: event.timeHorizon,
+    keyPoints: event.keyPoints ?? [],
+    uncertainties: event.uncertainties ?? [],
+  };
+}
+
+export function NewsPanel({ symbol, event, timeframe, localReaction, autoLoadDetails = false }: NewsPanelProps) {
   const queryClient = useQueryClient();
+  const [settingsOpen, setSettingsOpen] = useState(false);
+  const [detailsRequested, setDetailsRequested] = useState(autoLoadDetails);
+  /** Per-news cache — switching events must not show another item's AI Summary. */
+  const [analysisById, setAnalysisById] = useState<Record<string, NewsAnalysis>>({});
+
+  useEffect(() => {
+    setDetailsRequested(autoLoadDetails);
+  }, [event?.id, autoLoadDetails]);
+
+  const { data: config } = useQuery({
+    queryKey: ['public-config'],
+    queryFn: fetchPublicConfig,
+    staleTime: 60_000,
+  });
+  const llmReady = Boolean(
+    config?.deepseekConfigured && config.llmProvider && config.llmProvider !== 'rules',
+  );
 
   const reactionQuery = useQuery({
     queryKey: ['reaction', symbol, event?.id, timeframe],
-    queryFn: () => fetchEventReaction(symbol, event!.id, timeframe),
-    enabled: Boolean(event?.id),
+    queryFn: ({ signal }) => fetchEventReaction(symbol, event!.id, timeframe, signal),
+    enabled: Boolean(event?.id) && detailsRequested && !localReaction,
     retry: false,
   });
 
   const contentQuery = useQuery({
     queryKey: ['news-content', event?.id],
-    queryFn: () => fetchNewsContent(event!.id),
-    enabled: Boolean(event?.id),
+    queryFn: ({ signal }) => fetchNewsContent(event!.id, signal),
+    enabled: Boolean(event?.id) && detailsRequested,
     staleTime: Infinity,
     retry: false,
   });
@@ -41,12 +77,20 @@ export function NewsPanel({ symbol, event, timeframe }: NewsPanelProps) {
     .filter(Boolean);
 
   const analyzeMut = useMutation({
-    mutationFn: () => analyzeNews(event!.id),
-    onSuccess: () => {
+    mutationFn: (newsId: string) => analyzeNews(newsId),
+    onSuccess: (data, newsId) => {
+      setAnalysisById((prev) => ({ ...prev, [newsId]: data }));
       queryClient.invalidateQueries({ queryKey: ['events', symbol] });
       queryClient.invalidateQueries({ queryKey: ['news', symbol] });
     },
   });
+
+  const currentAnalysis = useMemo(() => {
+    if (!event) return null;
+    return analysisById[event.id] ?? analysisFromEvent(event);
+  }, [event, analysisById]);
+
+  const analyzingCurrent = analyzeMut.isPending && analyzeMut.variables === event?.id;
 
   if (!event) {
     return (
@@ -64,7 +108,7 @@ export function NewsPanel({ symbol, event, timeframe }: NewsPanelProps) {
         ? TrendingDown
         : Minus;
 
-  const reaction = reactionQuery.data;
+  const reaction = localReaction ?? reactionQuery.data;
 
   return (
     <div className="flex h-full flex-col overflow-hidden">
@@ -99,20 +143,18 @@ export function NewsPanel({ symbol, event, timeframe }: NewsPanelProps) {
       </div>
 
       <div className="flex-1 space-y-4 overflow-y-auto p-4">
-        {event.imageUrl && (
-          <section className="overflow-hidden rounded-md border border-border">
-            <img
-              src={event.imageUrl}
-              alt=""
-              className="max-h-48 w-full object-cover"
-              loading="lazy"
-              referrerPolicy="no-referrer"
-              onError={(e) => {
-                (e.currentTarget as HTMLImageElement).style.display = 'none';
-              }}
-            />
-          </section>
-        )}
+        <section className="overflow-hidden rounded-md border border-border">
+          <img
+            src={relatedNewsImageUrl(event, symbol)}
+            alt=""
+            className="max-h-48 w-full object-cover"
+            loading="lazy"
+            referrerPolicy="no-referrer"
+            onError={(e) => {
+              (e.currentTarget as HTMLImageElement).style.display = 'none';
+            }}
+          />
+        </section>
 
         {(event.summaryAi || event.summaryOriginal) && (
           <section>
@@ -125,7 +167,15 @@ export function NewsPanel({ symbol, event, timeframe }: NewsPanelProps) {
 
         <section>
           <h3 className="mb-1 text-xs font-medium uppercase tracking-wide text-muted">Article</h3>
-          {contentQuery.isLoading ? (
+          {!detailsRequested ? (
+            <button
+              type="button"
+              onClick={() => setDetailsRequested(true)}
+              className="btn-ghost w-full border border-border py-2.5 text-sm"
+            >
+              读取正文与完整事件指标
+            </button>
+          ) : contentQuery.isLoading ? (
             <p className="text-sm text-muted">正在读取正文…</p>
           ) : paragraphs.length > 0 ? (
             <div className="space-y-2">
@@ -143,23 +193,34 @@ export function NewsPanel({ symbol, event, timeframe }: NewsPanelProps) {
           )}
         </section>
 
-        <button
-          type="button"
-          onClick={() => analyzeMut.mutate()}
-          disabled={analyzeMut.isPending}
-          className="btn-primary w-full"
-        >
-          <Sparkles className="h-4 w-4" />
-          {analyzeMut.isPending ? 'Analyzing…' : 'AI Summary'}
-        </button>
+        <div className="flex items-center gap-2">
+          <button
+            type="button"
+            onClick={() => analyzeMut.mutate(event.id)}
+            disabled={analyzingCurrent}
+            className="btn-primary flex-1"
+          >
+            <Sparkles className="h-4 w-4" />
+            {analyzingCurrent ? '分析中…' : currentAnalysis ? '重新分析' : 'AI Summary'}
+          </button>
+          <AiStatusBadge ready={llmReady} loading={!config} />
+          <button
+            type="button"
+            onClick={() => setSettingsOpen(true)}
+            className="btn-ghost inline-flex items-center gap-1 border border-border px-3"
+            title="AI 设置（与区间分析共用）"
+          >
+            <Settings2 className="h-4 w-4" />
+          </button>
+        </div>
 
-        {analyzeMut.data && (
+        {currentAnalysis && (
           <section className="rounded-md border border-news/30 bg-news/5 p-3">
             <h3 className="mb-1 text-xs font-medium text-news">AI Analysis</h3>
-            <p className="text-sm text-gray-300">{analyzeMut.data.summaryZh}</p>
-            {analyzeMut.data.keyPoints.length > 0 && (
+            <p className="text-sm text-gray-300">{currentAnalysis.summaryZh}</p>
+            {currentAnalysis.keyPoints.length > 0 && (
               <ul className="mt-2 list-inside list-disc text-sm text-muted">
-                {analyzeMut.data.keyPoints.map((p) => (
+                {currentAnalysis.keyPoints.map((p) => (
                   <li key={p}>{p}</li>
                 ))}
               </ul>
@@ -167,7 +228,9 @@ export function NewsPanel({ symbol, event, timeframe }: NewsPanelProps) {
           </section>
         )}
 
-        {reactionQuery.isLoading && (
+        <AiSettingsPanel open={settingsOpen} onClose={() => setSettingsOpen(false)} />
+
+        {detailsRequested && reactionQuery.isLoading && !localReaction && (
           <p className="text-sm text-muted">Loading reaction metrics…</p>
         )}
 
@@ -198,7 +261,7 @@ function Metric({
   isRatio = false,
 }: {
   label: string;
-  value: number | null;
+  value: number | null | undefined;
   isRatio?: boolean;
 }) {
   if (value === null || value === undefined) {

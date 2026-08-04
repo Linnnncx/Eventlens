@@ -1,5 +1,26 @@
 import { describe, expect, it } from 'vitest';
 import { alignEventToBar, alignEventToBarIso } from '../src/utils/eventAlign';
+import { indexNewsByBar } from '../src/features/chart/newsAnchors';
+import type { Bar, NewsItem } from '../src/types/api';
+
+function bar(timestamp: string): Bar {
+  return { symbol: 'AAPL', timestamp, open: 100, high: 102, low: 99, close: 101, volume: 1_000 };
+}
+
+function news(id: string, publishedAt: string): NewsItem {
+  return {
+    id,
+    headline: id,
+    source: 'test',
+    publishedAt,
+    symbols: ['AAPL'],
+    eventType: 'other',
+    importance: 'medium',
+    direction: 'uncertain',
+    timeHorizon: 'short_term',
+    provider: 'fixture',
+  };
+}
 
 describe('alignEventToBar', () => {
   const tz = 'America/New_York';
@@ -46,5 +67,26 @@ describe('alignEventToBar', () => {
     const a = alignEventToBar('2024-06-03T14:07:30.000Z', '5Min', tz);
     const b = alignEventToBar(new Date('2024-06-03T14:07:30.000Z'), '5Min', tz);
     expect(a.getTime()).toBe(b.getTime());
+  });
+});
+
+describe('indexNewsByBar regression', () => {
+  it('keeps intraday news inside the candle that contains publish time', () => {
+    const bars = [bar('2024-06-03T14:00:00.000Z'), bar('2024-06-03T14:05:00.000Z')];
+    const mapped = indexNewsByBar(bars, [news('inside', '2024-06-03T14:07:30.000Z')], '5Min');
+    expect(mapped.get(Date.parse('2024-06-03T14:05:00.000Z') / 1000)?.[0]?.id).toBe('inside');
+  });
+
+  it('does not attach premarket news to the previous session close', () => {
+    const bars = [bar('2024-05-31T19:55:00.000Z'), bar('2024-06-03T13:30:00.000Z')];
+    const mapped = indexNewsByBar(bars, [news('premarket', '2024-06-03T12:30:00.000Z')], '5Min');
+    expect(mapped.get(Date.parse('2024-06-03T13:30:00.000Z') / 1000)?.[0]?.id).toBe('premarket');
+    expect(mapped.get(Date.parse('2024-05-31T19:55:00.000Z') / 1000)).toBeUndefined();
+  });
+
+  it('maps weekend daily news to the nearest real trading candle', () => {
+    const bars = [bar('2024-05-31T13:30:00.000Z'), bar('2024-06-03T13:30:00.000Z')];
+    const mapped = indexNewsByBar(bars, [news('weekend', '2024-06-02T16:00:00.000Z')], '1Day');
+    expect(mapped.get(Date.parse('2024-06-03T13:30:00.000Z') / 1000)?.[0]?.id).toBe('weekend');
   });
 });

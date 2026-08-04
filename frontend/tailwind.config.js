@@ -11,7 +11,7 @@ export default {
           hover: '#1c212b',
         },
         border: {
-          DEFAULT: '#252a35',
+          DEFAULT: '#2a3140',
           muted: '#1e232d',
         },
         primary: {
@@ -31,11 +31,24 @@ export default {
           DEFAULT: '#a78bfa',
           dim: '#8b5cf6',
         },
-        muted: '#8b95a8',
+        muted: '#9aa3b5',
       },
       fontFamily: {
-        sans: ['Inter', 'system-ui', '-apple-system', 'Segoe UI', 'Roboto', 'sans-serif'],
-        mono: ['JetBrains Mono', 'ui-monospace', 'SFMono-Regular', 'monospace'],
+        sans: [
+          'IBM Plex Sans',
+          'Segoe UI',
+          'system-ui',
+          '-apple-system',
+          'sans-serif',
+        ],
+        mono: ['IBM Plex Mono', 'JetBrains Mono', 'ui-monospace', 'monospace'],
+      },
+      boxShadow: {
+        card: '0 1px 0 rgba(255,255,255,0.03) inset, 0 8px 24px rgba(0,0,0,0.28)',
+        float: '0 12px 40px rgba(0,0,0,0.45), 0 0 0 1px rgba(255,255,255,0.04)',
+      },
+      fontSize: {
+        '2xs': ['0.7rem', { lineHeight: '1rem' }],
       },
     },
   },

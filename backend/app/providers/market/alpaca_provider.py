@@ -86,6 +86,7 @@ class AlpacaMarketDataProvider:
                     dayHigh=float(daily.get("h") or price),
                     dayLow=float(daily.get("l") or price),
                     volume=float(daily.get("v") or 0),
+                    turnover=price * float(daily.get("v") or 0),
                     provider=self.name,
                     timestamp=parse_dt(latest.get("t") or datetime.now(timezone.utc)),
                 )
@@ -126,7 +127,9 @@ class AlpacaMarketDataProvider:
             "5Min": "5Min",
             "15Min": "15Min",
             "1Hour": "1Hour",
+            "4Hour": "4Hour",
             "1Day": "1Day",
+            "1Month": "1Month",
         }
         if timeframe not in tf_map:
             raise ProviderUnavailable(self.name, f"Unsupported timeframe {timeframe}")

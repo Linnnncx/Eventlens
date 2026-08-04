@@ -22,6 +22,7 @@ export function SearchBox({
   const [query, setQuery] = useState('');
   const [debounced, setDebounced] = useState('');
   const [open, setOpen] = useState(false);
+  const [activeIndex, setActiveIndex] = useState(0);
   const containerRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -31,7 +32,7 @@ export function SearchBox({
 
   const { data, isFetching } = useQuery({
     queryKey: ['search', debounced],
-    queryFn: () => searchSymbols(debounced, 12),
+    queryFn: ({ signal }) => searchSymbols(debounced, 12, signal),
     enabled: debounced.length >= 1,
     staleTime: 30_000,
   });
@@ -61,6 +62,8 @@ export function SearchBox({
 
   const items = data?.items ?? [];
 
+  useEffect(() => setActiveIndex(0), [debounced, items.length]);
+
   return (
     <div ref={containerRef} className={`relative ${className}`}>
       <div className="relative">
@@ -75,8 +78,16 @@ export function SearchBox({
           }}
           onFocus={() => setOpen(true)}
           onKeyDown={(e) => {
-            if (e.key === 'Enter' && items[0]) {
-              handleSelect(items[0].symbol);
+            if (e.key === 'ArrowDown' && items.length) {
+              e.preventDefault();
+              setActiveIndex((i) => (i + 1) % items.length);
+            }
+            if (e.key === 'ArrowUp' && items.length) {
+              e.preventDefault();
+              setActiveIndex((i) => (i - 1 + items.length) % items.length);
+            }
+            if (e.key === 'Enter' && items[activeIndex]) {
+              handleSelect(items[activeIndex].symbol);
             }
             if (e.key === 'Escape') setOpen(false);
           }}
@@ -92,12 +103,14 @@ export function SearchBox({
           {items.length === 0 && !isFetching ? (
             <div className="px-3 py-2 text-sm text-muted">No symbols found</div>
           ) : (
-            items.map((item: SymbolProfile) => (
+            items.map((item: SymbolProfile, index) => (
               <button
                 key={item.symbol}
                 type="button"
                 onClick={() => handleSelect(item.symbol)}
-                className="flex w-full items-center justify-between px-3 py-2 text-left text-sm hover:bg-surface-hover"
+                className={`flex w-full items-center justify-between px-3 py-2 text-left text-sm hover:bg-surface-hover ${
+                  index === activeIndex ? 'bg-surface-hover' : ''
+                }`}
               >
                 <span className="font-medium">{item.symbol}</span>
                 <span className="truncate pl-3 text-muted">{item.name}</span>

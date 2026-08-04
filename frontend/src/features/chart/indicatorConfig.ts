@@ -21,7 +21,7 @@ export type SubIndicatorId =
   | 'roc';
 
 export const MAIN_INDICATORS: { id: MainIndicatorId; label: string }[] = [
-  { id: 'ma', label: 'MA 20/50' },
+  { id: 'ma', label: 'MA' },
   { id: 'ema', label: 'EMA 12/26' },
   { id: 'boll', label: 'BOLL 20,2' },
   { id: 'vwap', label: 'VWAP' },
@@ -29,6 +29,36 @@ export const MAIN_INDICATORS: { id: MainIndicatorId; label: string }[] = [
   { id: 'support', label: '支撑/压力 20' },
   { id: 'donchian', label: 'Donchian 20' },
 ];
+
+/** Default MA periods shown on the main chart when MA is enabled. */
+export const DEFAULT_MA_PERIODS = [5, 10, 20] as const;
+export const MA_PERIOD_COLORS = ['#3b82f6', '#f59e0b', '#a78bfa', '#22d3ee', '#f472b6'] as const;
+const MA_PERIODS_KEY = 'eventlens.ma-periods.v1';
+
+export function normalizeMaPeriods(raw: unknown): number[] {
+  const nums = (Array.isArray(raw) ? raw : [])
+    .map((n) => Number(n))
+    .filter((n) => Number.isFinite(n) && n >= 2 && n <= 250)
+    .map((n) => Math.round(n));
+  const unique = [...new Set(nums)].sort((a, b) => a - b).slice(0, 5);
+  return unique.length > 0 ? unique : [...DEFAULT_MA_PERIODS];
+}
+
+export function loadMaPeriods(): number[] {
+  try {
+    return normalizeMaPeriods(JSON.parse(localStorage.getItem(MA_PERIODS_KEY) ?? ''));
+  } catch {
+    return [...DEFAULT_MA_PERIODS];
+  }
+}
+
+export function saveMaPeriods(periods: number[]) {
+  localStorage.setItem(MA_PERIODS_KEY, JSON.stringify(normalizeMaPeriods(periods)));
+}
+
+export function formatMaLabel(periods: number[]): string {
+  return `MA ${periods.join('/')}`;
+}
 
 export const SUB_INDICATORS: { id: SubIndicatorId; label: string }[] = [
   { id: 'macd', label: 'MACD' },

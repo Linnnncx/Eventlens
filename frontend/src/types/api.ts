@@ -15,7 +15,7 @@ export type Direction = 'positive' | 'negative' | 'neutral' | 'uncertain';
 export type TimeHorizon = 'immediate' | 'short_term' | 'medium_term' | 'long_term';
 export type OrderSide = 'buy' | 'sell';
 export type OrderType = 'market' | 'limit';
-export type Timeframe = '1Min' | '5Min' | '15Min' | '1Hour' | '1Day';
+export type Timeframe = '1Min' | '5Min' | '15Min' | '1Hour' | '4Hour' | '1Day' | '1Month';
 
 export interface ProviderMeta {
   provider: string;
@@ -42,7 +42,9 @@ export interface SymbolProfile {
 export interface UniverseSymbol {
   symbol: string;
   name: string;
+  companyName?: string;
   sector?: string;
+  assetType?: string;
   isCore?: boolean;
 }
 
@@ -82,7 +84,11 @@ export interface Snapshot {
   dayHigh: number;
   dayLow: number;
   volume: number;
+  turnover?: number;
+  marketCap?: number | null;
   sector: string;
+  assetType?: string;
+  indices?: string[];
   provider: string;
   timestamp: string;
 }
@@ -123,6 +129,25 @@ export interface NewsAnalysis {
   uncertainties: string[];
 }
 
+export interface RangeAnalysisReport {
+  symbol: string;
+  timeframe: string;
+  start: string;
+  end: string;
+  title: string;
+  summaryZh: string;
+  technicalSummary: string;
+  newsSummary: string;
+  outlook: string;
+  keyPoints: string[];
+  risks: string[];
+  barCount: number;
+  newsCount: number;
+  model: string;
+  usedLlm: boolean;
+  disclaimer: string;
+}
+
 export interface RiskSummary {
   summary: string;
   riskLevel: 'low' | 'medium' | 'high';
@@ -141,6 +166,28 @@ export interface BarsResponse {
 
 export interface QuoteResponse {
   quote: Quote;
+  meta: ProviderMeta;
+}
+
+export interface OrderBookLevel {
+  price: number;
+  size: number;
+  orders: number;
+}
+
+export interface OrderBook {
+  symbol: string;
+  bids: OrderBookLevel[];
+  asks: OrderBookLevel[];
+  mid: number;
+  spread: number;
+  timestamp: string;
+  synthetic: boolean;
+  provider: string;
+}
+
+export interface OrderBookResponse {
+  book: OrderBook;
   meta: ProviderMeta;
 }
 
@@ -247,11 +294,23 @@ export interface SimulateOrderResponse {
 export interface Position {
   symbol: string;
   quantity: number;
+  availableQuantity?: number;
   avgCost: number;
+  costValue?: number;
   price: number;
+  previousClose?: number;
   marketValue: number;
+  /** Unrealized / floating PnL vs average cost (legacy alias). */
   pnl: number;
   pnlPercent: number;
+  floatingPnl?: number;
+  floatingPnlPercent?: number;
+  todayPnl?: number;
+  todayPnlPercent?: number;
+  holdingPnl?: number;
+  holdingPnlPercent?: number;
+  /** Closed P&L from sells vs cost basis (fees included). */
+  realizedPnl?: number;
   weight: number;
   sector: string;
 }
@@ -279,8 +338,33 @@ export interface Order {
   status: string;
   filledPrice: number | null;
   filledAt: string | null;
+  fee?: number | null;
   newsId: string | null;
   createdAt: string;
+}
+
+export interface TradeFeeBreakdown {
+  commission: number;
+  platformFee: number;
+  clearingFee: number;
+  taf: number;
+  schedule: string;
+}
+
+export interface Trade {
+  id: string;
+  orderId: string;
+  symbol: string;
+  side: OrderSide;
+  quantity: number;
+  price: number;
+  fee: number;
+  feeBreakdown?: TradeFeeBreakdown;
+  notional: number;
+  orderType: OrderType | null;
+  orderCreatedAt: string | null;
+  filledAt: string | null;
+  createdAt: string | null;
 }
 
 export interface PublicConfig {

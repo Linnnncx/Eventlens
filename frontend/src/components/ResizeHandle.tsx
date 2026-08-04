@@ -130,8 +130,8 @@ export interface WorkbenchLayout {
 }
 
 export const DEFAULT_LAYOUT: WorkbenchLayout = {
-  leftWidth: 288,
-  rightWidth: 416,
+  leftWidth: 320,
+  rightWidth: 520,
   chartHeight: 360,
   indicatorHeight: 240,
   bottomHeight: 200,
@@ -141,10 +141,10 @@ const STORAGE_KEY = 'eventlens.workbench.layout.v2';
 
 const LIMITS = {
   leftWidth: { min: 160, max: 560 },
-  rightWidth: { min: 260, max: 720 },
+  rightWidth: { min: 320, max: 800 },
   chartHeight: { min: 180, max: 900 },
   indicatorHeight: { min: 100, max: 1200 },
-  bottomHeight: { min: 100, max: 640 },
+  bottomHeight: { min: 220, max: 900 },
 } as const;
 
 function clamp(key: keyof WorkbenchLayout, value: number): number {
@@ -159,7 +159,11 @@ function loadLayout(): WorkbenchLayout {
     const parsed = JSON.parse(raw) as Partial<WorkbenchLayout>;
     return {
       leftWidth: clamp('leftWidth', parsed.leftWidth ?? DEFAULT_LAYOUT.leftWidth),
-      rightWidth: clamp('rightWidth', parsed.rightWidth ?? DEFAULT_LAYOUT.rightWidth),
+      // Migrate previous default 416 → wider order-book panel
+      rightWidth: clamp(
+        'rightWidth',
+        parsed.rightWidth === 416 ? 520 : (parsed.rightWidth ?? DEFAULT_LAYOUT.rightWidth),
+      ),
       chartHeight: clamp('chartHeight', parsed.chartHeight ?? DEFAULT_LAYOUT.chartHeight),
       indicatorHeight: clamp(
         'indicatorHeight',

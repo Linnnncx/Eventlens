@@ -10,6 +10,9 @@ from sqlalchemy import (
     Text,
     UniqueConstraint,
     create_engine,
+    event,
+    Index,
+    text,
 )
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, sessionmaker
 
@@ -73,7 +76,10 @@ class MarketBarCache(Base):
 
 class NewsEventRow(Base):
     __tablename__ = "news_events"
-    __table_args__ = (UniqueConstraint("provider", "content_hash", name="uq_news_hash"),)
+    __table_args__ = (
+        UniqueConstraint("provider", "content_hash", name="uq_news_hash"),
+        Index("ix_news_symbol_published", "symbol", "published_at"),
+    )
 
     id: Mapped[str] = mapped_column(String(64), primary_key=True)
     external_id: Mapped[Optional[str]] = mapped_column(String(128), nullable=True)
@@ -213,6 +219,15 @@ engine = create_engine(
     _settings.database_url,
     connect_args={"check_same_thread": False} if _settings.database_url.startswith("sqlite") else {},
 )
+
+if _settings.database_url.startswith("sqlite"):
+    @event.listens_for(engine, "connect")
+    def _configure_sqlite(dbapi_connection, _connection_record) -> None:
+        cursor = dbapi_connection.cursor()
+        cursor.execute("PRAGMA journal_mode=WAL")
+        cursor.execute("PRAGMA synchronous=NORMAL")
+        cursor.execute("PRAGMA busy_timeout=5000")
+        cursor.close()
 SessionLocal = sessionmaker(bind=engine, autoflush=False, autocommit=False)
 
 
@@ -226,3 +241,11 @@ def get_db():
 
 def init_db() -> None:
     Base.metadata.create_all(bind=engine)
+    # ``create_all`` does not add newly declared indexes to an existing SQLite DB.
+    with engine.begin() as conn:
+        conn.execute(
+            text(
+                "CREATE INDEX IF NOT EXISTS ix_news_symbol_published "
+                "ON news_events (symbol, published_at)"
+            )
+        )

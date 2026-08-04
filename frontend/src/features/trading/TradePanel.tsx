@@ -47,6 +47,7 @@ export function TradePanel({ symbol, side, newsId, onSuccess }: TradePanelProps)
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['portfolio'] });
       queryClient.invalidateQueries({ queryKey: ['orders'] });
+      queryClient.invalidateQueries({ queryKey: ['trades'] });
       queryClient.invalidateQueries({ queryKey: ['positions'] });
       onSuccess?.();
     },

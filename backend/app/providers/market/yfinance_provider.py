@@ -13,6 +13,7 @@ from app.providers.market.fixture_provider import (
     DEFAULT_RANGES,
     TIMEFRAME_MAP,
     FixtureMarketDataProvider,
+    aggregate_bars,
     find_universe,
     market_status_now,
     parse_dt,
@@ -148,6 +149,18 @@ class YFinanceMarketDataProvider:
                 pct = (change / prev_close * 100) if prev_close else 0
                 meta = result.get("meta") or {}
                 row = find_universe(sym) or {}
+                volume = float(meta.get("regularMarketVolume") or last["volume"])
+                mcap = meta.get("marketCap")
+                try:
+                    mcap_f = float(mcap) if mcap is not None else None
+                except (TypeError, ValueError):
+                    mcap_f = None
+                # Prefer approximate market cap from the local universe when Yahoo omits it
+                if mcap_f is None and row.get("marketCap"):
+                    try:
+                        mcap_f = float(row["marketCap"])
+                    except (TypeError, ValueError):
+                        mcap_f = None
                 return Snapshot(
                     symbol=sym,
                     name=row.get("companyName", meta.get("shortName") or sym),
@@ -157,8 +170,12 @@ class YFinanceMarketDataProvider:
                     changePercent=pct,
                     dayHigh=float(meta.get("regularMarketDayHigh") or last["high"]),
                     dayLow=float(meta.get("regularMarketDayLow") or last["low"]),
-                    volume=float(meta.get("regularMarketVolume") or last["volume"]),
+                    volume=volume,
+                    turnover=price * volume,
+                    marketCap=mcap_f,
                     sector=row.get("sector", "Unknown"),
+                    assetType=row.get("assetType", "equity"),
+                    indices=list(row.get("indices") or []),
                     provider=self.name,
                     timestamp=last["timestamp"],
                 )
@@ -235,11 +252,13 @@ class YFinanceMarketDataProvider:
         limit: int | None,
     ) -> list[Bar]:
         symbol = symbol.upper()
-        if timeframe not in TIMEFRAME_MAP:
+        if timeframe not in TIMEFRAME_MAP and timeframe not in DEFAULT_RANGES:
             raise ProviderUnavailable(self.name, f"Unsupported timeframe {timeframe}")
-        interval = TIMEFRAME_MAP[timeframe]
+        interval = TIMEFRAME_MAP.get(timeframe)
+        if not interval:
+            raise ProviderUnavailable(self.name, f"Unsupported timeframe {timeframe}")
         end = end or datetime.now(timezone.utc)
-        start = start or (end - DEFAULT_RANGES[timeframe])
+        start = start or (end - DEFAULT_RANGES.get(timeframe, timedelta(days=180)))
         # Clip intraday ranges to Yahoo chart limits
         if timeframe == "1Min":
             start = max(start, end - timedelta(days=7))
@@ -247,6 +266,9 @@ class YFinanceMarketDataProvider:
             start = max(start, end - timedelta(days=60))
         elif timeframe == "15Min":
             start = max(start, end - timedelta(days=60))
+        elif timeframe == "4Hour":
+            # Need denser 1h history before aggregating to 4h
+            start = max(start, end - timedelta(days=730))
 
         def _hist() -> list[Bar]:
             result = fetch_chart(symbol, interval=interval, period1=start, period2=end)
@@ -263,6 +285,8 @@ class YFinanceMarketDataProvider:
                 )
                 for r in rows
             ]
+            if timeframe == "4Hour":
+                bars = aggregate_bars(bars, 4 * 3600)
             if limit:
                 bars = bars[-limit:]
             return bars

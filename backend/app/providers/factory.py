@@ -47,7 +47,12 @@ class ProviderFactory:
         return YFinanceRealtimeProvider()
 
     def create_llm_provider(self):
-        if self.settings.llm_provider == "deepseek" and self.settings.deepseek_configured:
+        from app.core.llm_runtime import effective_llm_config
+
+        from app.core.llm_runtime import CLOUD_PROVIDERS
+
+        cfg = effective_llm_config()
+        if cfg["effectiveProvider"] in CLOUD_PROVIDERS:
             return DeepSeekLLMProvider()
         return RuleBasedLLMProvider()
 

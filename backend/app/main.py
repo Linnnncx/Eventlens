@@ -14,6 +14,7 @@ from app.database.session import WatchlistRow, init_db, SessionLocal
 from app.providers.factory import provider_factory
 from app.providers.yahoo_http import apply_proxy_env
 from app.services.trading import ensure_portfolio
+from app.services.market_hub import get_shared_quote
 
 
 class ConnectionManager:
@@ -79,33 +80,40 @@ async def lifespan(app: FastAPI):
                 except Exception:
                     pass
                 try:
-                    # pull one round of quotes manually for reliability
-                    market = provider_factory.create_market_provider()
-                    for sym in list(symbols)[:30]:
+                    # Parallel quote fetch — sequential Yahoo calls were a major lag source.
+                    syms = list(symbols)[:20]
+
+                    async def _one(sym: str):
                         try:
-                            q = await market.get_quote(sym)
-                            msg = {
-                                "type": "quote",
-                                "symbol": sym,
-                                "price": q.price,
-                                "timestamp": q.timestamp.isoformat(),
-                                "provider": q.provider,
-                            }
-                            dead = []
-                            for ws, subs in list(manager.subscriptions.items()):
-                                if sym in subs:
-                                    try:
-                                        await manager.send(ws, msg)
-                                    except Exception:
-                                        dead.append(ws)
-                            for ws in dead:
-                                manager.disconnect(ws)
+                            quote, _provider, _cached = await get_shared_quote(sym, max_age=5.0)
+                            return sym, quote
                         except Exception:
+                            return sym, None
+
+                    results = await asyncio.gather(*[_one(s) for s in syms])
+                    for sym, q in results:
+                        if q is None:
                             continue
+                        msg = {
+                            "type": "quote",
+                            "symbol": sym,
+                            "price": q.price,
+                            "timestamp": q.timestamp.isoformat(),
+                            "provider": q.provider,
+                        }
+                        dead = []
+                        for ws, subs in list(manager.subscriptions.items()):
+                            if sym in subs:
+                                try:
+                                    await manager.send(ws, msg)
+                                except Exception:
+                                    dead.append(ws)
+                        for ws in dead:
+                            manager.disconnect(ws)
                 except Exception:
                     pass
             try:
-                await asyncio.wait_for(stop.wait(), timeout=5)
+                await asyncio.wait_for(stop.wait(), timeout=8)
             except asyncio.TimeoutError:
                 continue
         try:

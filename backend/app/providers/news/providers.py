@@ -8,7 +8,8 @@ from typing import Any
 import yfinance as yf
 
 from app.providers.base import ProviderUnavailable
-from app.providers.market.fixture_provider import FixtureNewsProvider, content_hash, find_universe, parse_dt
+from app.providers.market.fixture_provider import FixtureNewsProvider, content_hash, parse_dt
+from app.providers.yahoo_http import company_name_for
 from app.schemas.market import NewsItem
 from app.services.news_classify import classify_headline
 
@@ -61,8 +62,7 @@ class YFinanceNewsProvider:
 
             items: list[NewsItem] = []
             seen: set[str] = set()
-            row = find_universe(symbol) or {}
-            company = row.get("companyName")
+            company = company_name_for(symbol)
             try:
                 raw_list = fetch_symbol_news(symbol, company_name=company, limit=max(limit, 40))
             except Exception:
@@ -198,18 +198,20 @@ class AlpacaNewsProvider:
             headline = raw.get("headline") or "Untitled"
             url = raw.get("url")
             h = content_hash(headline, url, published.isoformat())
+            summary = raw.get("summary")
+            event_type, importance, direction = classify_headline(headline, summary)
             out.append(
                 NewsItem(
                     id=f"alp_{raw.get('id', h)}",
                     headline=headline,
-                    summaryOriginal=raw.get("summary"),
+                    summaryOriginal=summary,
                     source=raw.get("source") or "Alpaca",
                     url=url,
                     publishedAt=published,
                     symbols=raw.get("symbols") or [symbol.upper()],
-                    eventType="company_update",
-                    importance="medium",
-                    direction="uncertain",
+                    eventType=event_type,
+                    importance=importance,
+                    direction=direction,
                     timeHorizon="short_term",
                     provider=self.name,
                 )
@@ -347,11 +349,9 @@ class GoogleNewsProvider:
         from app.providers.news.google_news import fetch_google_news
 
         symbol = symbol.upper()
-        row = find_universe(symbol) or {}
-        company = row.get("companyName")
 
         def _fetch() -> list[dict[str, Any]]:
-            return fetch_google_news(symbol, company, start, end, limit)
+            return fetch_google_news(symbol, company_name_for(symbol), start, end, limit)
 
         try:
             raw_list = await asyncio.to_thread(_fetch)
