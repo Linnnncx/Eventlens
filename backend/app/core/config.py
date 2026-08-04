@@ -43,6 +43,15 @@ class Settings(BaseSettings):
     yfinance_news_refresh_seconds: int = 300
     yfinance_enable_websocket: bool = True
 
+    # Production-only news prewarming worker. The worker is started by
+    # docker-compose.prod.yml, so local development remains request-driven.
+    news_scheduler_interval_seconds: int = 900
+    news_scheduler_lookback_days: int = 7
+    news_scheduler_limit: int = 120
+    news_scheduler_max_symbols: int = 10
+    news_scheduler_concurrency: int = 2
+    news_scheduler_symbols: str = ""
+
     alpaca_api_key: str = ""
     alpaca_api_secret: str = ""
     alpaca_feed: str = "iex"

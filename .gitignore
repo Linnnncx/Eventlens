@@ -6,6 +6,7 @@ backend/.venv/
 __pycache__/
 *.pyc
 .env
+.env.production
 .DS_Store
 backend/data/*.db
 backend/data/*.db-shm

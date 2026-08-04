@@ -355,8 +355,8 @@ export function MobileIndicatorPane({
     }
     let price = valueByTimeRef.current.get(crosshairTime);
     if (price == null || !Number.isFinite(price)) {
-      const vr = chart.priceScale('right').getVisibleRange();
-      price = vr ? (vr.from + vr.to) / 2 : 0;
+      const middlePrice = series.coordinateToPrice((hostRef.current?.clientHeight ?? PANE_HEIGHT) / 2);
+      price = middlePrice == null ? 0 : Number(middlePrice);
     }
     try {
       chart.setCrosshairPosition(price, crosshairTime as Time, series);
